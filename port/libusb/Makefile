@@ -36,4 +36,6 @@ endif
 # CFLAGS  += -I/usr/local/include -DHAVE_PORTAUDIO
 # LDFLAGS += -L/sw/lib -lportaudio -Wl,-framework,CoreAudio -Wl,-framework,AudioToolbox -Wl,-framework,AudioUnit -Wl,-framework,Carbon
 
+# EXAMPLES = le_counter le_streamer
+
 all: ${EXAMPLES}

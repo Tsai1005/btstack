@@ -73,7 +73,9 @@ static const char    hsp_hs_service_name[] = "Headset Test";
 static hci_con_handle_t sco_handle = 0;
 
 static char hs_cmd_buffer[100];
-static bd_addr_t device_addr = {0x00,0x1b,0xDC,0x07,0x32,0xEF};
+/* static bd_addr_t device_addr = {0x00,0x1b,0xDC,0x07,0x32,0xEF}; */
+/* static bd_addr_t device_addr = {0x7c,0x04,0xd0,0x66,0xa4,0x37};      //JL-iphone7 */
+static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00
 
 /* @section Audio Transfer Setup 
  *

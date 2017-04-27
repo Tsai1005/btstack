@@ -2042,6 +2042,7 @@ static void event_handler(uint8_t *packet, int size){
                     reverse_bd_addr(&packet[8], addr);
                     addr_type = (bd_addr_type_t)packet[7];
                     log_info("LE Connection_complete (status=%u) type %u, %s", packet[3], addr_type, bd_addr_to_str(addr));
+                    printf("LE Connection_complete (status=%u) type %u, %s\n", packet[3], addr_type, bd_addr_to_str(addr));
                     conn = hci_connection_for_bd_addr_and_type(addr, addr_type);
 #ifdef ENABLE_LE_CENTRAL
                     // if auto-connect, remove from whitelist in both roles

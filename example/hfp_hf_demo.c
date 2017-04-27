@@ -70,7 +70,8 @@
 uint8_t hfp_service_buffer[150];
 const uint8_t   rfcomm_channel_nr = 1;
 const char hfp_hf_service_name[] = "BTstack HFP HF Demo";
-static bd_addr_t device_addr = {0x80,0xbe,0x05,0xd5,0x28,0x48};
+/* static bd_addr_t device_addr = {0x80,0xbe,0x05,0xd5,0x28,0x48}; */
+static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00
 
 #ifdef HAVE_POSIX_STDIN
 // 80:BE:05:D5:28:48
@@ -128,7 +129,7 @@ static void show_usage(void){
     printf("d - query network operator                 | D - Enable HFP AG registration status update via bitmap(IIA)\n");
     printf("f - answer incoming call                   | F - Hangup call\n");
     printf("g - query network operator name            | G - reject incoming call\n");
-    printf("i - dial 1234567                           | I - dial 7654321\n");
+    printf("i - dial 10086                             | I - dial 7654321\n");
     printf("j - dial #1                                | J - dial #99\n");
     printf("o - Set speaker volume to 0  (minimum)     | O - Set speaker volume to 9  (default)\n");
     printf("p - Set speaker volume to 12 (higher)      | P - Set speaker volume to 15 (maximum)\n");
@@ -255,7 +256,7 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
         case 'i':
             log_info("USER:\'%c\'", cmd);
             printf("Dial 1234567\n");
-            hfp_hf_dial_number(acl_handle, "1234567");
+            hfp_hf_dial_number(acl_handle, "10086");
             break;
         case 'I':
             log_info("USER:\'%c\'", cmd);

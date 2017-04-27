@@ -87,7 +87,7 @@ const uint8_t adv_data[] = {
     // Flags general discoverable, BR/EDR not supported
     0x02, BLUETOOTH_DATA_TYPE_FLAGS, 0x06, 
     // Name
-    0x0b, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, 'L', 'E', ' ', 'C', 'o', 'u', 'n', 't', 'e', 'r', 
+    0x0b, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, 'J', 'L', ' ', 'C', 'o', 'u', 'n', 't', 'e', 'r', 
     // Incomplete List of 16-bit Service Class UUIDs -- FF10 - only valid for testing!
     0x03, BLUETOOTH_DATA_TYPE_INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, 0x10, 0xff,
 };
@@ -185,12 +185,21 @@ static void packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *pack
 
     switch (packet_type) {
         case HCI_EVENT_PACKET:
+            printf("\n %s / ", __BTSTACK_FILE__);
             switch (hci_event_packet_get_type(packet)) {
                 case HCI_EVENT_DISCONNECTION_COMPLETE:
                     le_notification_enabled = 0;
                     break;
                 case ATT_EVENT_CAN_SEND_NOW:
                     att_server_notify(con_handle, ATT_CHARACTERISTIC_0000FF11_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE, (uint8_t*) counter_string, counter_string_len);
+                    break;
+                case HCI_EVENT_LE_META:
+                    switch(hci_event_le_meta_get_subevent_code(packet))
+                    {
+                        case HCI_SUBEVENT_LE_CONNECTION_COMPLETE:
+                            printf("HCI_SUBEVENT_LE_CONNECTION_COMPLETE\n");
+                            break;
+                    }
                     break;
             }
             break;
