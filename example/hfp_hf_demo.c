@@ -71,7 +71,8 @@ uint8_t hfp_service_buffer[150];
 const uint8_t   rfcomm_channel_nr = 1;
 const char hfp_hf_service_name[] = "BTstack HFP HF Demo";
 /* static bd_addr_t device_addr = {0x80,0xbe,0x05,0xd5,0x28,0x48}; */
-static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00
+/* static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00 */
+static bd_addr_t device_addr = {0x7c,0x04,0xd0,0x66,0xa4,0x37};      //JL-iphone7
 
 #ifdef HAVE_POSIX_STDIN
 // 80:BE:05:D5:28:48
