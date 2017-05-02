@@ -1128,7 +1128,7 @@ static int usb_open(void){
 
 			log_info("usb_open: Device Path: %s", DevIntfDetailData->DevicePath);
 
-#if 0
+#if 1
             // check for hard-coded vendor/product ids
 			char vid_pid_match[30];
 			uint16_t vid = 0x0a12;
@@ -1145,7 +1145,7 @@ static int usb_open(void){
 					log_error("usb_open: Device open failed");					
 				}
 			}
-#endif
+#else
 
             // try all devices
             BOOL result = usb_try_open_device(DevIntfDetailData->DevicePath);
@@ -1155,6 +1155,7 @@ static int usb_open(void){
             } else {
                 log_error("usb_open: Device open failed");                  
             }
+#endif
         }
 		HeapFree(GetProcessHeap(), 0, DevIntfDetailData);
 
@@ -1358,6 +1359,10 @@ static void usb_set_sco_config(uint16_t voice_setting, int num_connections){
            usb_sco_start();
         }
     }
+}
+#else 
+static void usb_set_sco_config(uint16_t voice_setting, int num_connections){
+
 }
 #endif
 

@@ -57,6 +57,7 @@
 
 #include "stdin_support.h"
 
+#include "bluetooth_company_id.h"
 #include "btstack_chipset_bcm.h"
 #include "btstack_chipset_csr.h"
 #include "btstack_chipset_cc256x.h"
@@ -71,7 +72,7 @@ static hci_transport_config_uart_t config = {
     HCI_TRANSPORT_CONFIG_UART,
     115200,
     0,  // main baudrate
-    1,  // flow control
+    0,  // flow control
     NULL,
 };
 
@@ -179,10 +180,10 @@ static void local_version_information_handler(uint8_t * packet){
             use_fast_uart();
             hci_set_chipset(btstack_chipset_stlc2500d_instance());
             break;
-        case BUETOOTH_COMPANY_ID_EM_MICROELECTRONICS_MARIN:
-            printf("EM Microelectronics - using EM9301 driver.\n");
-            hci_set_chipset(btstack_chipset_em9301_instance());
-            break;
+        /* case BUETOOTH_COMPANY_ID_EM_MICROELECTRONICS_MARIN: */
+            /* printf("EM Microelectronics - using EM9301 driver.\n"); */
+            /* hci_set_chipset(btstack_chipset_em9301_instance()); */
+            /* break; */
         case BLUETOOTH_COMPANY_ID_NORDIC_SEMICONDUCTOR_ASA:
             printf("Nordic Semiconductor nRF5 chipset.\n");
             break;        
@@ -202,7 +203,7 @@ int main(int argc, const char * argv[]){
     hci_dump_open("hci_dump.pklg", HCI_DUMP_PACKETLOGGER);
 
     // pick serial port
-    config.device_name = "\\\\.\\COM7";
+    config.device_name = "\\\\.\\COM4";
 
     // init HCI
     const btstack_uart_block_t * uart_driver = btstack_uart_block_windows_instance();
@@ -219,9 +220,11 @@ int main(int argc, const char * argv[]){
     signal(SIGINT, sigint_handler);
 
     // setup app
+    printf("setup app\n");
     btstack_main(argc, argv);
 
     // go
+    printf("btstack go run loop ...\n");
     btstack_run_loop_execute();    
 
 	return 0;

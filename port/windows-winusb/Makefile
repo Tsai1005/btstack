@@ -28,6 +28,6 @@ VPATH += ${BTSTACK_ROOT}/platform/windows
 
 LDFLAGS += -lsetupapi -lwinusb
 
-EXAMPLES=le_counter hfp_hf_demo
+EXAMPLES=le_counter hfp_hf_demo le_streamer
 
 all: ${EXAMPLES}

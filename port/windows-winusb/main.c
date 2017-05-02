@@ -165,12 +165,15 @@ int main(int argc, const char * argv[]){
     hci_add_event_handler(&hci_event_callback_registration);
 
     // handle CTRL-c
+    printf("handle CTRL-c\n");
     signal(SIGINT, sigint_handler);
 
     // setup app
+    printf("setup app\n");
     btstack_main(argc, argv);
 
     // go
+    printf("go\n");
     btstack_run_loop_execute();    
 
     return 0;
