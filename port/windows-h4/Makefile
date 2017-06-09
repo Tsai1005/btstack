@@ -53,6 +53,6 @@ VPATH += ${BTSTACK_ROOT}/chipset/tc3566x
 # assume portaudio is installed in /usr/local
 # CFLAGS  += -I/usr/local/include -DHAVE_PORTAUDIO
 # LDFLAGS += -L/sw/lib -lportaudio
-EXAMPLES = le_counter le_streamer hfp_hf_demo hsp_hs_demo
+EXAMPLES = le_counter le_streamer hfp_hf_demo hsp_hs_demo le_streamer_client
 
 all: ${EXAMPLES}

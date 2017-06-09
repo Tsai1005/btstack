@@ -32,8 +32,8 @@ def as_hex(data):
 	return ''.join(str_list)
 
 if len(sys.argv) == 1:
-	print 'Dump PacketLogger file'
-	print 'Copyright 2014, BlueKitchen GmbH'
+	print "Dump PacketLogger file"
+	print "Copyright 2014, BlueKitchen GmbH"
 	print ''
 	print 'Usage: ', sys.argv[0], 'hci_dump.pklg'
 	exit(0)

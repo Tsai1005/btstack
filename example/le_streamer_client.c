@@ -162,8 +162,8 @@ static void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint
         case TC_W4_TEST_DATA:
             switch(hci_event_packet_get_type(packet)){
                 case GATT_EVENT_NOTIFICATION:
-                    printf("Data: ");
-                    printf_hexdump( gatt_event_notification_get_value(packet), gatt_event_notification_get_value_length(packet));
+                    /* printf("Data: "); */
+                    /* printf_hexdump( gatt_event_notification_get_value(packet), gatt_event_notification_get_value_length(packet)); */
                 case GATT_EVENT_QUERY_COMPLETE:
                     break;
                 default:
