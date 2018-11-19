@@ -57,6 +57,7 @@
 #include <string.h>
 
 #include "btstack.h"
+#include "sm_pairing_central.h"
 
 
 // We're looking for a remote device that lists this service in the advertisement
@@ -78,9 +79,6 @@ static btstack_packet_callback_registration_t sm_event_callback_registration;
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
 
 static void sm_pairing_central_setup(void){
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-
     l2cap_init();
 
     // setup le device db
@@ -88,20 +86,31 @@ static void sm_pairing_central_setup(void){
 
     // setup SM: Display only
     sm_init();
-    sm_event_callback_registration.callback = &packet_handler;
-    sm_add_event_handler(&sm_event_callback_registration);
+
+    // setup ATT server
+    att_server_init(profile_data, NULL, NULL);
 
     /**
      * Choose ONE of the following configurations
      */
 
+    // register handler
+    hci_event_callback_registration.callback = &packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
+    sm_event_callback_registration.callback = &packet_handler;
+    sm_add_event_handler(&sm_event_callback_registration);
+
+    att_server_register_packet_handler(packet_handler);
+
     // LE Legacy Pairing, Just Works
     sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_YES_NO);
-    sm_set_authentication_requirements(0);
+    sm_set_authentication_requirements(SM_AUTHREQ_NO_BONDING);
 
     // LE Legacy Pairing, Passkey entry initiator enter, responder (us) displays
     // sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_ONLY);
     // sm_set_authentication_requirements(SM_AUTHREQ_MITM_PROTECTION);
+    // sm_use_fixed_passkey_in_display_role(123456);
 
 #ifdef ENABLE_LE_SECURE_CONNECTIONS
     // LE Secure Connetions, Just Works
@@ -115,6 +124,7 @@ static void sm_pairing_central_setup(void){
     // LE Legacy Pairing, Passkey entry initiator enter, responder (us) displays
     // sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_ONLY);
     // sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION|SM_AUTHREQ_MITM_PROTECTION);
+    // sm_use_fixed_passkey_in_display_role(123456);
 #endif
 }
 
@@ -166,19 +176,40 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
             break;
         case SM_EVENT_NUMERIC_COMPARISON_REQUEST:
-            printf("Confirming numeric comparison: %u\n", sm_event_numeric_comparison_request_get_passkey(packet));
+            printf("Confirming numeric comparison: %"PRIu32"\n", sm_event_numeric_comparison_request_get_passkey(packet));
             sm_numeric_comparison_confirm(sm_event_passkey_display_number_get_handle(packet));
             break;
         case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
-            printf("Display Passkey: %u\n", sm_event_passkey_display_number_get_passkey(packet));
+            printf("Display Passkey: %"PRIu32"\n", sm_event_passkey_display_number_get_passkey(packet));
             break;
-
+        case SM_EVENT_PAIRING_COMPLETE:
+            switch (sm_event_pairing_complete_get_status(packet)){
+                case ERROR_CODE_SUCCESS:
+                    printf("Pairing complete, success\n");
+                    break;
+                case ERROR_CODE_CONNECTION_TIMEOUT:
+                    printf("Pairing failed, timeout\n");
+                    break;
+                case ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION:
+                    printf("Pairing faileed, disconnected\n");
+                    break;
+                case ERROR_CODE_AUTHENTICATION_FAILURE:
+                    printf("Pairing failed, reason = %u\n", sm_event_pairing_complete_get_reason(packet));
+                    break;
+                default:
+                    break;
+            }
+            break;
         case HCI_EVENT_LE_META:
             // wait for connection complete
             if (hci_event_le_meta_get_subevent_code(packet) != HCI_SUBEVENT_LE_CONNECTION_COMPLETE) break;
             con_handle = hci_subevent_le_connection_complete_get_connection_handle(packet);
             // start pairing
             sm_request_pairing(con_handle);
+            break;
+        case HCI_EVENT_ENCRYPTION_CHANGE: 
+            con_handle = hci_event_encryption_change_get_connection_handle(packet);
+            printf("Connection encrypted: %u\n", hci_event_encryption_change_get_encryption_enabled(packet));
             break;
         default:
             break;

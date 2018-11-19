@@ -44,6 +44,7 @@
 #include <signal.h>
 
 #include "btstack_config.h"
+#include "bluetooth_company_id.h"
 
 #include "btstack_debug.h"
 #include "btstack_event.h"
@@ -55,7 +56,7 @@
 #include "hal_led.h"
 #include "btstack_link_key_db_fs.h"
 
-#include "stdin_support.h"
+#include "btstack_stdin.h"
 
 #include "bluetooth_company_id.h"
 #include "btstack_chipset_bcm.h"
@@ -137,9 +138,9 @@ static void use_fast_uart(void){
 
 static void local_version_information_handler(uint8_t * packet){
     printf("Local version information:\n");
-    uint16_t hci_version    = little_endian_read_16(packet, 4);
-    uint16_t hci_revision   = little_endian_read_16(packet, 6);
-    uint16_t lmp_version    = little_endian_read_16(packet, 8);
+    uint16_t hci_version    = packet[6];
+    uint16_t hci_revision   = little_endian_read_16(packet, 7);
+    uint16_t lmp_version    = packet[9];
     uint16_t manufacturer   = little_endian_read_16(packet, 10);
     uint16_t lmp_subversion = little_endian_read_16(packet, 12);
     printf("- HCI Version  0x%04x\n", hci_version);
@@ -187,6 +188,11 @@ static void local_version_information_handler(uint8_t * packet){
         case BLUETOOTH_COMPANY_ID_NORDIC_SEMICONDUCTOR_ASA:
             printf("Nordic Semiconductor nRF5 chipset.\n");
             break;        
+        case BLUETOOTH_COMPANY_ID_TOSHIBA_CORP:
+            printf("Toshiba - using TC3566x driver.\n");
+            hci_set_chipset(btstack_chipset_tc3566x_instance());
+            use_fast_uart();
+            break;
         default:
             printf("Unknown manufacturer / manufacturer not supported yet.\n");
             break;
@@ -204,6 +210,14 @@ int main(int argc, const char * argv[]){
 
     // pick serial port
     config.device_name = "\\\\.\\COM4";
+
+    // accept path from command line
+    if (argc >= 3 && strcmp(argv[1], "-u") == 0){
+        config.device_name = argv[2];
+        argc -= 2;
+        memmove(&argv[1], &argv[3], (argc-1) * sizeof(char *));
+    }
+    printf("H4 device: %s\n", config.device_name);
 
     // init HCI
     const btstack_uart_block_t * uart_driver = btstack_uart_block_windows_instance();

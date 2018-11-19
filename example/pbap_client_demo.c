@@ -36,7 +36,17 @@
  */
 
 #define __BTSTACK_FILE__ "pbap_client_demo.c"
- 
+
+// *****************************************************************************
+/* EXAMPLE_START(pbap_client_demo): Connect to Phonebook Server and get contacts.
+ *
+ * @text Note: The Bluetooth address of the remote Phonbook server is hardcoded. 
+ * Change it before running example, then use the UI to connect to it, to set and 
+ * query contacts.
+ */
+// *****************************************************************************
+
+
 #include "btstack_config.h"
 
 #include <stdint.h>
@@ -46,18 +56,13 @@
 
 #include "btstack_run_loop.h"
 #include "l2cap.h"
-#include "rfcomm.h"
+#include "classic/rfcomm.h"
 #include "btstack_event.h"
 #include "classic/goep_client.h"
 #include "classic/pbap_client.h"
 
-#ifdef HAVE_POSIX_STDIN
-#include <unistd.h>
-#include "stdin_support.h"
-#endif
-
-#ifndef HAVE_POSIX_STDIN
-static int step = 0;
+#ifdef HAVE_BTSTACK_STDIN
+#include "btstack_stdin.h"
 #endif
 
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
@@ -65,12 +70,16 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 static bd_addr_t    remote_addr;
 // MBP2016 "F4-0F-24-3B-1B-E1"
 // Nexus 7 "30-85-A9-54-2E-78"
-static const char * remote_addr_string = "30-85-A9-54-2E-78";
+// iPhone SE "BC:EC:5D:E6:15:03"
+// PTS "001BDC080AA5"
+static  char * remote_addr_string = "BC:EC:5D:E6:15:03";
+
+static char * phone_number = "911";
 
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 static uint16_t pbap_cid;
 
-#ifdef HAVE_POSIX_STDIN
+#ifdef HAVE_BTSTACK_STDIN
 
 // Testig User Interface 
 static void show_usage(void){
@@ -82,20 +91,18 @@ static void show_usage(void){
     printf("a - establish PBAP connection to %s\n", bd_addr_to_str(remote_addr));
     printf("b - set phonebook '/telecom/pb'\n");
     printf("c - set phonebook '/SIM1/telecom/pb'\n");
-    printf("d - pull phonebook\n");
-    printf("e - disconnnect\n");
-    printf("---\n");
-    printf("Ctrl-c - exit\n");
-    printf("---\n");
+    printf("r - set path to '/root/telecom'\n");
+    printf("d - get phonebook size\n");
+    printf("e - pull phonebook\n");
+    printf("f - disconnnect\n");
+    printf("g - Lookup contact with number '%s'\n", phone_number);    
+    printf("p - authenticate using password '0000'\n");
+    printf("r - set path to 'telecom'\n");
+    printf("\n");
 }
 
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    UNUSED(ds);
-    UNUSED(callback_type);
-
-    char cmd = btstack_stdin_read();
-
-    switch (cmd){
+static void stdin_process(char c){
+    switch (c){
         case 'a':
             printf("[+] Connecting to %s...\n", bd_addr_to_str(remote_addr));
             pbap_connect(&packet_handler, remote_addr, &pbap_cid);
@@ -109,10 +116,23 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
             pbap_set_phonebook(pbap_cid, "SIM1/telecom/pb");
             break;
         case 'd':
-            pbap_pull_phonebook(pbap_cid);
+            pbap_get_phonebook_size(pbap_cid);
             break;
         case 'e':
+            pbap_pull_phonebook(pbap_cid);
+            break;
+        case 'f':
             pbap_disconnect(pbap_cid);
+            break;
+        case 'g':
+            pbap_lookup_by_number(pbap_cid, phone_number);
+            break;
+        case 'p':
+            pbap_authentication_password(pbap_cid, "0000");
+            break;
+        case 'r':
+            printf("[+] Set path to 'telecom'\n");
+            pbap_set_phonebook(pbap_cid, "telecom");
             break;
         default:
             show_usage();
@@ -125,6 +145,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
     UNUSED(channel);
     UNUSED(size);
     int i;
+    uint8_t status;
+    char buffer[32];
     switch (packet_type){
         case HCI_EVENT_PACKET:
             switch (hci_event_packet_get_type(packet)) {
@@ -137,13 +159,37 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                 case HCI_EVENT_PBAP_META:
                     switch (hci_event_pbap_meta_get_subevent_code(packet)){
                         case PBAP_SUBEVENT_CONNECTION_OPENED:
-                            printf("[+] Connected\n");
+                            status = pbap_subevent_connection_opened_get_status(packet);
+                            if (status){
+                                printf("[!] Connection failed, status 0x%02x\n", status);
+                            } else {
+                                printf("[+] Connected\n");
+                            }
                             break;
                         case PBAP_SUBEVENT_CONNECTION_CLOSED:
                             printf("[+] Connection closed\n");
                             break;
                         case PBAP_SUBEVENT_OPERATION_COMPLETED:
                             printf("[+] Operation complete\n");
+                            break;
+                        case PBAP_SUBEVENT_AUTHENTICATION_REQUEST:
+                            printf("[?] Authentication requested\n");
+                            break;
+                        case PBAP_SUBEVENT_PHONEBOOK_SIZE:
+                            status = pbap_subevent_phonebook_size_get_status(packet);
+                            if (status){
+                                printf("[!] Get Phonebook size error: 0x%x\n", status);
+                            } else {
+                                printf("[+] Phonebook size: %u\n", pbap_subevent_phonebook_size_get_phoneboook_size(packet));
+                            }
+                            break;
+                        case PBAP_SUBEVENT_CARD_RESULT:
+                            memcpy(buffer, pbap_subevent_card_result_get_name(packet), pbap_subevent_card_result_get_name_len(packet));
+                            buffer[pbap_subevent_card_result_get_name_len(packet)] = 0;
+                            printf("[-] Name:   '%s'\n", buffer);
+                            memcpy(buffer, pbap_subevent_card_result_get_handle(packet), pbap_subevent_card_result_get_handle_len(packet));
+                            buffer[pbap_subevent_card_result_get_handle_len(packet)] = 0;
+                            printf("[-] Handle: '%s'\n", buffer);
                             break;
                         default:
                             break;
@@ -218,13 +264,7 @@ int btstack_main(int argc, const char * argv[]){
 
     (void)argc;
     (void)argv;
-
-    sscanf_bd_addr(remote_addr_string, remote_addr);
         
-    // register for HCI events
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-
     // init L2CAP
     l2cap_init();
 
@@ -237,7 +277,13 @@ int btstack_main(int argc, const char * argv[]){
     // init PBAP Client
     pbap_client_init();
 
-#ifdef HAVE_POSIX_STDIN
+    // register for HCI events
+    hci_event_callback_registration.callback = &packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
+    sscanf_bd_addr(remote_addr_string, remote_addr);
+
+#ifdef HAVE_BTSTACK_STDIN
     btstack_stdin_setup(stdin_process);
 #endif    
 
@@ -246,3 +292,4 @@ int btstack_main(int argc, const char * argv[]){
 
     return 0;
 }
+/* EXAMPLE_END */

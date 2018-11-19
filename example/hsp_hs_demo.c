@@ -47,7 +47,7 @@
  * @text This example implements a HSP Headset device that sends and receives 
  * audio signal over HCI SCO. It demonstrates how to receive 
  * an output from a remote audio gateway (AG), and, 
- * if HAVE_POSIX_STDIN is defined, how to control the AG. 
+ * if HAVE_BTSTACK_STDIN is defined, how to control the AG. 
  */
 // *****************************************************************************
 
@@ -57,12 +57,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "btstack.h"
 #include "sco_demo_util.h"
-#ifdef HAVE_POSIX_STDIN
-#include "stdin_support.h"
+#ifdef HAVE_BTSTACK_STDIN
+#include "btstack_stdin.h"
 #endif
 
 static btstack_packet_callback_registration_t hci_event_callback_registration;
@@ -73,9 +72,12 @@ static const char    hsp_hs_service_name[] = "Headset Test";
 static hci_con_handle_t sco_handle = 0;
 
 static char hs_cmd_buffer[100];
-/* static bd_addr_t device_addr = {0x00,0x1b,0xDC,0x07,0x32,0xEF}; */
-/* static bd_addr_t device_addr = {0x7c,0x04,0xd0,0x66,0xa4,0x37};      //JL-iphone7 */
-static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00
+/* static bd_addr_t *device_addr = "0x00,0x1b,0xDC,0x07,0x32,0xEF"; */
+/* static bd_addr_t *device_addr = "0x7c,0x04,0xd0,0x66,0xa4,0x37";      //JL-iphone7 */
+/* static bd_addr_t *device_addr = "0x80,0x13,0x82,0x8e,0x8a,0x4d";      //HUAWEI TAG-TL00 */
+// mac 2013: 
+static const char * device_addr_string = "84:38:35:65:d1:15";
+static bd_addr_t device_addr;
 
 /* @section Audio Transfer Setup 
  *
@@ -118,19 +120,12 @@ static void show_usage(void){
     printf("o - set speaker gain 0\n");
     printf("s - set speaker gain 8\n");
     printf("S - set speaker gain 15\n");
-    printf("---\n");
-    printf("Ctrl-c - exit\n");
-    printf("---\n");
+    printf("\n");
 }
 
-#ifdef HAVE_POSIX_STDIN
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    UNUSED(ds);
-    UNUSED(callback_type);
-
-    char buffer = btstack_stdin_read();
-
-    switch (buffer){
+#ifdef HAVE_BTSTACK_STDIN
+static void stdin_process(char c){
+    switch (c){
         case 'c':
             printf("Connect to %s\n", bd_addr_to_str(device_addr));
             hsp_hs_connect(device_addr);
@@ -244,7 +239,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * even
                             break;
                         case HSP_SUBEVENT_AG_INDICATION: {
                             memset(hs_cmd_buffer, 0, sizeof(hs_cmd_buffer));
-                            int size = hsp_subevent_ag_indication_get_value_length(event);
+                            unsigned int size = hsp_subevent_ag_indication_get_value_length(event);
                             if (size >= sizeof(hs_cmd_buffer)-1){
                                 size =  sizeof(hs_cmd_buffer)-1;
                             }
@@ -287,11 +282,7 @@ int btstack_main(int argc, const char * argv[]){
     (void)argv;
 
     sco_demo_init();
-
-    // register for HCI events
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-    hci_register_sco_packet_handler(&packet_handler);
+    sco_demo_set_codec(HFP_CODEC_CVSD);
 
     l2cap_init();
 
@@ -303,17 +294,27 @@ int btstack_main(int argc, const char * argv[]){
     rfcomm_init();
 
     hsp_hs_init(rfcomm_channel_nr);
+
+    // register for HCI events and SCO packets
+    hci_event_callback_registration.callback = &packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+    hci_register_sco_packet_handler(&packet_handler);
+
+    // register for HSP events
     hsp_hs_register_packet_handler(packet_handler);
 
-#ifdef HAVE_POSIX_STDIN
+#ifdef HAVE_BTSTACK_STDIN
     btstack_stdin_setup(stdin_process);
 #endif
 
-    gap_set_local_name("BTstack HSP HS");
+    gap_set_local_name("HSP HS Demo 00:00:00:00:00:00");
     gap_discoverable_control(1);
     gap_ssp_set_io_capability(SSP_IO_CAPABILITY_DISPLAY_YES_NO);
     gap_set_class_of_device(0x240404);
 
+    // Parse human readable Bluetooth address.
+    sscanf_bd_addr(device_addr_string, device_addr);
+    
     // turn on!
     hci_power_control(HCI_POWER_ON);
     return 0;

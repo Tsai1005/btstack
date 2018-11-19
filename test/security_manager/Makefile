@@ -6,18 +6,20 @@ BTSTACK_ROOT =  ../..
 
 CFLAGS  = -DUNIT_TEST -g
 CPPFLAGS =  -x c++ -Wall -Wno-unused
-CFLAGS += -I. -I.. -I${BTSTACK_ROOT}/src -I${BTSTACK_ROOT}/ble -I${BTSTACK_ROOT}/platform/posix
+CFLAGS += -I. -I.. -I${BTSTACK_ROOT}/src -I${BTSTACK_ROOT}/platform/posix
 CFLAGS += -I${BTSTACK_ROOT}/3rd-party/mbedtls/include
 CFLAGS += -I${BTSTACK_ROOT}/3rd-party/micro-ecc
+CFLAGS += -I${BTSTACK_ROOT}/test/rijndael
 LDFLAGS +=  -lCppUTest -lCppUTestExt
 
 VPATH += ${BTSTACK_ROOT}/src
 VPATH += ${BTSTACK_ROOT}/src/ble 
 VPATH += ${BTSTACK_ROOT}/platform/posix
-VPATH += ${BTSTACK_ROOT}/3rd-party/mbedtls/library
 VPATH += ${BTSTACK_ROOT}/3rd-party/micro-ecc
+VPATH += ${BTSTACK_ROOT}/test/rijndael
 
 COMMON = \
+    btstack_crypto.c    		\
     btstack_linked_list.c		\
     btstack_memory.c			\
     btstack_memory_pool.c		\
@@ -41,7 +43,7 @@ MBEDTLS = \
 MICROECC = \
 	uECC.c
 
-all: security_manager aestest ecc_mbed_tls ecc_micro_ecc aes_cmac_test
+all: security_manager aestest ecc_micro_ecc aes_cmac_test
 # sm_mbedtls_allocator_test
 
 security_manager: ${CORE_OBJ} ${COMMON_OBJ} security_manager.c
@@ -49,9 +51,6 @@ security_manager: ${CORE_OBJ} ${COMMON_OBJ} security_manager.c
 
 aestest: aestest.o rijndael.o
 	${CC} ${CFLAGS} $^ -o $@
-
-ecc_mbed_tls: ecc_mbed_tls.o ${MBEDTLS}
-	gcc ${CFLAGS} $^ -o $@ 
 
 ecc_micro_ecc: ecc_micro_ecc.o ${MICROECC}
 	gcc ${CFLAGS} $^ -o $@ 
@@ -66,12 +65,11 @@ test: all
 	./security_manager
 	./aes_cmac_test
 	./aestest
-	./ecc_mbed_tls
 	./ecc_micro_ecc
 	./aes_cmac_test
 	
 clean:
-	rm -f  security_manager
+	rm -f  security_manager aestest ecc_micro_ecc aes_cmac_test
 	rm -f  *.o
 	rm -rf *.dSYM
 	

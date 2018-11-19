@@ -95,10 +95,6 @@ const uint8_t adv_data_len = sizeof(adv_data);
 
 static void le_counter_setup(void){
 
-    // register for HCI events
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-
     l2cap_init();
 
     // setup le device db
@@ -109,7 +105,6 @@ static void le_counter_setup(void){
 
     // setup ATT server
     att_server_init(profile_data, att_read_callback, att_write_callback);    
-    att_server_register_packet_handler(packet_handler);
 
     // setup battery service
     battery_service_server_init(battery);
@@ -123,6 +118,13 @@ static void le_counter_setup(void){
     gap_advertisements_set_params(adv_int_min, adv_int_max, adv_type, 0, null_addr, 0x07, 0x00);
     gap_advertisements_set_data(adv_data_len, (uint8_t*) adv_data);
     gap_advertisements_enable(1);
+
+    // register for HCI events
+    hci_event_callback_registration.callback = &packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
+    // register for ATT event
+    att_server_register_packet_handler(packet_handler);
 
     // set one-shot timer
     heartbeat.process = &heartbeat_handler;
@@ -226,12 +228,7 @@ static uint16_t att_read_callback(hci_con_handle_t connection_handle, uint16_t a
     UNUSED(connection_handle);
 
     if (att_handle == ATT_CHARACTERISTIC_0000FF11_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE){
-        if (buffer){
-            memcpy(buffer, &counter_string[offset], buffer_size);
-            return buffer_size;
-        } else {
-            return counter_string_len;
-        }
+        return att_read_callback_handle_blob((const uint8_t *)counter_string, buffer_size, offset, buffer, buffer_size);
     }
     return 0;
 }

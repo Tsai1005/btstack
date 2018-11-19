@@ -65,7 +65,7 @@
 #include "hci_dump.h"
 #include "l2cap.h"
 #include "pan.h"
-#include "stdin_support.h"
+#include "btstack_stdin.h"
 
 #define HARDWARE_TYPE_ETHERNET 0x0001
 
@@ -596,11 +596,8 @@ static void show_usage(void){
     printf("---\n");
 }
 
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    char buffer;
-    read(ds->fd, &buffer, 1);
-
-    switch (buffer){
+static void stdin_process(char c){
+    switch (c){
         case 'p':
             printf("Connecting to PTS at %s...\n", bd_addr_to_str(pts_addr));
             bnep_connect(&packet_handler, pts_addr, bnep_l2cap_psm, bnep_src_uuid, bnep_dest_uuid);
@@ -661,8 +658,9 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
 }
 
 /*************** PANU client routines *********************/
-static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
-{
+static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
+    UNUSED(channel);
+
     uint8_t   event;
     bd_addr_t event_addr;
     bd_addr_t src_addr;
@@ -813,7 +811,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 
 int btstack_main(int argc, const char * argv[]);
 int btstack_main(int argc, const char * argv[]){
-    
+    UNUSED(argc);
+    (void)argv;
     /* Register for HCI events */
     hci_event_callback_registration.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);

@@ -62,6 +62,7 @@ static uint16_t battery_value_handle_client_configuration;
 
 
 static uint16_t battery_service_read_callback(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t offset, uint8_t * buffer, uint16_t buffer_size){
+	UNUSED(con_handle);
 	UNUSED(offset);
 	UNUSED(buffer_size);
 
@@ -74,7 +75,6 @@ static uint16_t battery_service_read_callback(hci_con_handle_t con_handle, uint1
 	if (attribute_handle == battery_value_handle_client_configuration){
 		if (buffer){
 			little_endian_store_16(buffer, 0, battery_value_client_configuration);
-			battery_value_client_configuration_connection = con_handle;
 		}
 		return 2;
 	}
@@ -82,13 +82,13 @@ static uint16_t battery_service_read_callback(hci_con_handle_t con_handle, uint1
 }
 
 static int battery_service_write_callback(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t transaction_mode, uint16_t offset, uint8_t *buffer, uint16_t buffer_size){
-	UNUSED(con_handle);
 	UNUSED(transaction_mode);
 	UNUSED(offset);
 	UNUSED(buffer_size);
 
 	if (attribute_handle == battery_value_handle_client_configuration){
 		battery_value_client_configuration = little_endian_read_16(buffer, 0);
+		battery_value_client_configuration_connection = con_handle;
 	}
 	return 0;
 }
@@ -112,12 +112,12 @@ void battery_service_server_init(uint8_t value){
 	battery_value_handle_value = gatt_server_get_value_handle_for_characteristic_with_uuid16(start_handle, end_handle, ORG_BLUETOOTH_CHARACTERISTIC_BATTERY_LEVEL);
 	battery_value_handle_client_configuration = gatt_server_get_client_configuration_handle_for_characteristic_with_uuid16(start_handle, end_handle, ORG_BLUETOOTH_CHARACTERISTIC_BATTERY_LEVEL);
 
-	// register service with ATT DB	
+	// register service with ATT Server
 	battery_service.start_handle   = start_handle;
 	battery_service.end_handle     = end_handle;
 	battery_service.read_callback  = &battery_service_read_callback;
 	battery_service.write_callback = &battery_service_write_callback;
-	att_register_service_handler(&battery_service);
+	att_server_register_service_handler(&battery_service);
 }
 
 void battery_service_server_set_battery_value(uint8_t value){

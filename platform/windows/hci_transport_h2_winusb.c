@@ -77,31 +77,33 @@
 // Function signatures frome https://abi-laboratory.pro/compatibility/Windows_7.0_to_Windows_8.1/x86_64/info/winusb.dll/symbols.html
 // MSDN documentation has multiple errors (Jan 2017), annotated below
 
-typedef PVOID WINUSB_ISOCH_BUFFER_HANDLE, *PWINUSB_ISOCH_BUFFER_HANDLE;
+// As Isochochronous functions are provided by newer versions of ming64, we use a BTstack/BTSTACK prefix to prevent name collisions
 
-typedef struct _WINUSB_PIPE_INFORMATION_EX {
+typedef PVOID BTSTACK_WINUSB_ISOCH_BUFFER_HANDLE, *BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE;
+
+typedef struct _BTSTACK_WINUSB_PIPE_INFORMATION_EX {
   USBD_PIPE_TYPE PipeType;
   UCHAR          PipeId;
   USHORT         MaximumPacketSize;
   UCHAR          Interval;
   ULONG          MaximumBytesPerInterval;
-} WINUSB_PIPE_INFORMATION_EX, *PWINUSB_PIPE_INFORMATION_EX;
+} BTSTACK_WINUSB_PIPE_INFORMATION_EX, *BTSTACK_PWINUSB_PIPE_INFORMATION_EX;
 
-typedef WINBOOL (WINAPI * WinUsb_QueryPipeEx_t) (
+typedef WINBOOL (WINAPI * BTstack_WinUsb_QueryPipeEx_t) (
 	WINUSB_INTERFACE_HANDLE 	InterfaceHandle,
 	UCHAR						AlternateInterfaceNumber,
 	UCHAR 						PipeIndex,
-	PWINUSB_PIPE_INFORMATION_EX PipeInformationEx
+	BTSTACK_PWINUSB_PIPE_INFORMATION_EX PipeInformationEx
 );
-typedef WINBOOL (WINAPI * WinUsb_RegisterIsochBuffer_t)(
+typedef WINBOOL (WINAPI * BTstack_WinUsb_RegisterIsochBuffer_t)(
 	WINUSB_INTERFACE_HANDLE     InterfaceHandle,
 	UCHAR                       PipeID,
 	PVOID                       Buffer,
 	ULONG                       BufferLength,
-	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle
+	BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle
 );
-typedef WINBOOL (WINAPI * WinUsb_ReadIsochPipe_t)(
-    PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+typedef WINBOOL (WINAPI * BTstack_WinUsb_ReadIsochPipe_t)(
+    BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
     ULONG                       Offset,
     ULONG                       Length,
     PULONG                      FrameNumber,
@@ -109,8 +111,8 @@ typedef WINBOOL (WINAPI * WinUsb_ReadIsochPipe_t)(
     PUSBD_ISO_PACKET_DESCRIPTOR IsoPacketDescriptors,   // MSDN lists PULONG
     LPOVERLAPPED                Overlapped
 );
-typedef WINBOOL (WINAPI * WinUsb_ReadIsochPipeAsap_t)(
-    PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+typedef WINBOOL (WINAPI * BTstack_WinUsb_ReadIsochPipeAsap_t)(
+    BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
     ULONG                       Offset,
     ULONG                       Length,
     BOOL                        ContinueStream,
@@ -118,37 +120,37 @@ typedef WINBOOL (WINAPI * WinUsb_ReadIsochPipeAsap_t)(
     PUSBD_ISO_PACKET_DESCRIPTOR IsoPacketDescriptors,
  	LPOVERLAPPED                Overlapped
 );
-typedef WINBOOL (WINAPI * WinUsb_WriteIsochPipe_t)(
-    PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+typedef WINBOOL (WINAPI * BTstack_WinUsb_WriteIsochPipe_t)(
+    BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
     ULONG                       Offset,
     ULONG                       Length,
     PULONG                      FrameNumber,
 	LPOVERLAPPED                Overlapped
 );
-typedef WINBOOL (WINAPI * WinUsb_WriteIsochPipeAsap_t)(
-    PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+typedef WINBOOL (WINAPI * BTstack_WinUsb_WriteIsochPipeAsap_t)(
+    BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
     ULONG                       Offset,
     ULONG                       Length,
     BOOL                        ContinueStream,
 	LPOVERLAPPED                Overlapped
 );
-typedef WINBOOL (WINAPI * WinUsb_UnregisterIsochBuffer_t)(
-	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle
+typedef WINBOOL (WINAPI * BTstack_WinUsb_UnregisterIsochBuffer_t)(
+	BTSTACK_PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle
 );
-typedef WINBOOL (WINAPI * WinUsb_GetCurrentFrameNumber_t)(
+typedef WINBOOL (WINAPI * BTstack_WinUsb_GetCurrentFrameNumber_t)(
     WINUSB_INTERFACE_HANDLE     InterfaceHandle,        // MSDN lists 'Device handle returned from CreateFile'
     PULONG                      CurrentFrameNumber,
     LARGE_INTEGER               *TimeStamp
 );
 
-static WinUsb_QueryPipeEx_t 			WinUsb_QueryPipeEx;
-static WinUsb_RegisterIsochBuffer_t 	WinUsb_RegisterIsochBuffer;
-static WinUsb_ReadIsochPipe_t 			WinUsb_ReadIsochPipe;
-static WinUsb_ReadIsochPipeAsap_t 		WinUsb_ReadIsochPipeAsap;
-static WinUsb_WriteIsochPipe_t 			WinUsb_WriteIsochPipe;
-static WinUsb_WriteIsochPipeAsap_t 		WinUsb_WriteIsochPipeAsap;
-static WinUsb_UnregisterIsochBuffer_t 	WinUsb_UnregisterIsochBuffer;
-static WinUsb_GetCurrentFrameNumber_t   WinUsb_GetCurrentFrameNumber;
+static BTstack_WinUsb_QueryPipeEx_t 			BTstack_WinUsb_QueryPipeEx;
+static BTstack_WinUsb_RegisterIsochBuffer_t 	BTstack_WinUsb_RegisterIsochBuffer;
+static BTstack_WinUsb_ReadIsochPipe_t 			BTstack_WinUsb_ReadIsochPipe;
+static BTstack_WinUsb_ReadIsochPipeAsap_t 		BTstack_WinUsb_ReadIsochPipeAsap;
+static BTstack_WinUsb_WriteIsochPipe_t 			BTstack_WinUsb_WriteIsochPipe;
+static BTstack_WinUsb_WriteIsochPipeAsap_t 		BTstack_WinUsb_WriteIsochPipeAsap;
+static BTstack_WinUsb_UnregisterIsochBuffer_t 	BTstack_WinUsb_UnregisterIsochBuffer;
+static BTstack_WinUsb_GetCurrentFrameNumber_t   BTstack_WinUsb_GetCurrentFrameNumber;
 #endif
 
 // Doesn't work as expected
@@ -249,6 +251,8 @@ static int usb_acl_out_active;
 static uint8_t hci_event_in_buffer[2 + 255];
 static uint8_t hci_acl_in_buffer[HCI_INCOMING_PRE_BUFFER_SIZE + HCI_ACL_BUFFER_SIZE]; 
 
+// transport interface state
+static int usb_transport_open;
 
 #ifdef ENABLE_SCO_OVER_HCI
 
@@ -259,7 +263,7 @@ typedef enum {
 
 // SCO Incoming Windows
 static uint8_t hci_sco_in_buffer[ISOC_BUFFERS * SCO_PACKET_SIZE]; 
-static WINUSB_ISOCH_BUFFER_HANDLE hci_sco_in_buffer_handle;
+static BTSTACK_WINUSB_ISOCH_BUFFER_HANDLE hci_sco_in_buffer_handle;
 static USBD_ISO_PACKET_DESCRIPTOR hci_sco_packet_descriptors[ISOC_BUFFERS * NUM_ISO_PACKETS];
 static OVERLAPPED usb_overlapped_sco_in[ISOC_BUFFERS];
 static int usb_sco_in_expected_transfer;
@@ -274,7 +278,7 @@ static uint16_t sco_read_pos;
 static uint16_t sco_bytes_to_read;
 
 // SCO Outgoing Windows
-static WINUSB_ISOCH_BUFFER_HANDLE hci_sco_out_buffer_handle;
+static BTSTACK_WINUSB_ISOCH_BUFFER_HANDLE hci_sco_out_buffer_handle;
 static OVERLAPPED usb_overlapped_sco_out[SCO_RING_BUFFER_COUNT];
 static int        sco_ring_transfers_active;
 static int        usb_sco_out_expected_transfer;
@@ -299,27 +303,38 @@ static int      sco_shutdown;
 static uint16_t iso_packet_size;
 #endif
 
-#if 0
 // list of known devices, using VendorID/ProductID tuples
 static const uint16_t known_bluetooth_devices[] = {
     // DeLOCK Bluetooth 4.0
     0x0a5c, 0x21e8,
     // Asus BT400
     0x0b05, 0x17cb,
+    // BCM20702B0 (Generic USB Detuned Class 1 @ 20 MHz)
+    0x0a5c, 0x22be,
 };
 
 static int num_known_devices = sizeof(known_bluetooth_devices) / sizeof(uint16_t) / 2;
 
-static int usb_is_known_bluetooth_device(uint16_t vendor_id, uint16_t product_id){
+static int usb_is_known_bluetooth_device(const char * device_path){
     int i;
     for (i=0; i<num_known_devices; i++){
-        if (known_bluetooth_devices[i*2] == vendor_id && known_bluetooth_devices[i*2+1] == product_id){
+        // construct pid/vid substring
+        char substring[20];
+        sprintf(substring, "vid_%04x&pid_%04x", known_bluetooth_devices[i*2], known_bluetooth_devices[i*2+1]);
+        const char * pos = strstr(device_path, substring);
+        log_info("check %s in %s -> %p", substring, device_path, pos);
+        if (pos){
             return 1;
         }
     }
     return 0;
 }
-#endif
+
+static int usb_is_vmware_bluetooth_adapter(const char * device_path){
+    // VMware Vendor ID 0e0f
+    const char * pos = strstr(device_path, "\\usb#vid_0e0f&pid");
+    return pos ? 1 : 0;
+}
 
 #ifdef ENABLE_SCO_OVER_HCI
 static void sco_ring_init(void){
@@ -331,13 +346,13 @@ static int sco_ring_have_space(void){
 }
 static void usb_sco_register_buffers(void){
     BOOL result;
-    result = WinUsb_RegisterIsochBuffer(usb_interface_1_handle, sco_in_addr, hci_sco_in_buffer, sizeof(hci_sco_in_buffer), &hci_sco_in_buffer_handle);
+    result = BTstack_WinUsb_RegisterIsochBuffer(usb_interface_1_handle, sco_in_addr, hci_sco_in_buffer, sizeof(hci_sco_in_buffer), &hci_sco_in_buffer_handle);
     if (!result) {
         log_error("usb_sco_register_buffers: register in buffer failed, error %lu", GetLastError());
     }
     log_info("hci_sco_in_buffer_handle %p", hci_sco_in_buffer_handle);
 
-    result = WinUsb_RegisterIsochBuffer(usb_interface_1_handle, sco_out_addr, sco_ring_buffer, sizeof(sco_ring_buffer), &hci_sco_out_buffer_handle);
+    result = BTstack_WinUsb_RegisterIsochBuffer(usb_interface_1_handle, sco_out_addr, sco_ring_buffer, sizeof(sco_ring_buffer), &hci_sco_out_buffer_handle);
     if (!result) {
         log_error("usb_sco_unregister_buffers: register out buffer failed, error %lu", GetLastError());
     }
@@ -345,11 +360,11 @@ static void usb_sco_register_buffers(void){
 }
 static void usb_sco_unregister_buffers(void){
     if (hci_sco_in_buffer_handle){
-        WinUsb_UnregisterIsochBuffer(hci_sco_in_buffer_handle);
+        BTstack_WinUsb_UnregisterIsochBuffer(hci_sco_in_buffer_handle);
         hci_sco_in_buffer_handle = NULL;
     }
     if (hci_sco_out_buffer_handle){
-        WinUsb_UnregisterIsochBuffer(hci_sco_out_buffer_handle);
+        BTstack_WinUsb_UnregisterIsochBuffer(hci_sco_out_buffer_handle);
         hci_sco_out_buffer_handle = NULL;
     }
 }
@@ -434,10 +449,10 @@ static void usb_submit_sco_in_transfer_at_frame(int i, ULONG * frame_number){
 
     ULONG frame_before = *frame_number;
 
-    BOOL result = WinUsb_ReadIsochPipe(hci_sco_in_buffer_handle, i * SCO_PACKET_SIZE, iso_packet_size * NUM_ISO_PACKETS,  
+    BOOL result = BTstack_WinUsb_ReadIsochPipe(hci_sco_in_buffer_handle, i * SCO_PACKET_SIZE, iso_packet_size * NUM_ISO_PACKETS,  
         frame_number, NUM_ISO_PACKETS, &hci_sco_packet_descriptors[i * NUM_ISO_PACKETS], &usb_overlapped_sco_in[i]);
 
-    // log_info("WinUsb_ReadIsochPipe #%02u: current %lu, planned %lu - buffer %lu", i, current_frame_number, frame_before, frame_before - current_frame_number);
+    // log_info("BTstack_WinUsb_ReadIsochPipe #%02u: current %lu, planned %lu - buffer %lu", i, current_frame_number, frame_before, frame_before - current_frame_number);
 
     if (!result) {
         if (GetLastError() == ERROR_IO_PENDING) {
@@ -463,11 +478,11 @@ static void usb_submit_sco_in_transfer_asap(int i, int continue_stream){
 
     LARGE_INTEGER timestamp;
     ULONG current_frame_number;
-    WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
+    BTstack_WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
 
     // log_info("usb_submit_sco_in_transfer[%02u]: current frame %lu", i, current_frame_number);
 
-    BOOL result = WinUsb_ReadIsochPipeAsap(hci_sco_in_buffer_handle, i * SCO_PACKET_SIZE, iso_packet_size * NUM_ISO_PACKETS,  
+    BOOL result = BTstack_WinUsb_ReadIsochPipeAsap(hci_sco_in_buffer_handle, i * SCO_PACKET_SIZE, iso_packet_size * NUM_ISO_PACKETS,  
         continue_stream, NUM_ISO_PACKETS, &hci_sco_packet_descriptors[i * NUM_ISO_PACKETS], &usb_overlapped_sco_in[i]);
 
     if (!result) {
@@ -518,7 +533,17 @@ static void usb_process_acl_in(btstack_data_source_t *ds, btstack_data_source_ca
             // IO_INCOMPLETE -> wait for completed
             btstack_run_loop_enable_data_source_callbacks(ds, DATA_SOURCE_CALLBACK_READ);
         } else {
-            log_error("usb_process_acl_in: error writing");
+            log_error("usb_process_acl_in: error reading");
+
+            // Reset Pipe
+            err = WinUsb_ResetPipe(usb_interface_0_handle, acl_in_addr);
+            log_info("WinUsb_ResetPipe: result %u", (int) err);
+            if (err){
+                log_info("WinUsb_ResetPipe error %u", (int) GetLastError());
+            }
+            
+            // re-submit transfer
+            usb_submit_acl_in_transfer();
         }
         return;
     }
@@ -584,7 +609,7 @@ static void usb_process_sco_out(btstack_data_source_t *ds,  btstack_data_source_
     // get current frame number
     ULONG current_frame_number;
     LARGE_INTEGER timestamp;
-    WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
+    BTstack_WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
 
     // find index
     int transfer_index;
@@ -645,7 +670,7 @@ static void usb_process_sco_in(btstack_data_source_t *ds,  btstack_data_source_c
 
     // ULONG current_frame_number;
     // LARGE_INTEGER timestamp;
-    // WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
+    // BTstack_WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
 
     // log_info("usb_process_sco_in[%02u] -- current frame %lu", transfer_index, current_frame_number);
 
@@ -765,8 +790,8 @@ static BOOL usb_scan_for_bluetooth_endpoints(void) {
     result = WinUsb_QueryInterfaceSettings(usb_interface_1_handle, alt_setting, &usb_interface_descriptor);
     if (!result) goto exit_on_error;
     for (i=0;i<usb_interface_descriptor.bNumEndpoints;i++){
-        WINUSB_PIPE_INFORMATION_EX pipe;
-        result = WinUsb_QueryPipeEx(
+        BTSTACK_WINUSB_PIPE_INFORMATION_EX pipe;
+        result = BTstack_WinUsb_QueryPipeEx(
                      usb_interface_1_handle,
                      alt_setting,
                      (UCHAR) i,
@@ -858,7 +883,7 @@ static int usb_sco_start(void){
     // get current frame number
     ULONG current_frame_number;
     LARGE_INTEGER timestamp;
-    WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
+    BTstack_WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
     // plan for next tranfer
     sco_next_transfer_at_frame = current_frame_number + ISOC_BUFFERS * NUM_ISO_PACKETS;
 #endif
@@ -929,15 +954,25 @@ static int usb_try_open_device(const char * device_path){
     USB_INTERFACE_DESCRIPTOR usb_interface_descriptor;
     result = WinUsb_QueryInterfaceSettings(usb_interface_0_handle, 0, &usb_interface_descriptor);
     if (!result) goto exit_on_error;
+
+    // ignore virtual Bluetooth adapter of VMware
+    if (usb_is_vmware_bluetooth_adapter(device_path)) {
+        log_info("Ignoring simulated VMware Bluetooth adapter");
+        usb_free_resources();
+        return -1;
+    }
+
     // 
     if (usb_interface_descriptor.bInterfaceClass    != 0xe0 ||
         usb_interface_descriptor.bInterfaceSubClass != 0x01 || 
         usb_interface_descriptor.bInterfaceProtocol != 0x01){
 
-        // TODO: fallback to whitelist
-        log_info("Class, Subclass, Protocol does not match Bluetooth device");
-        usb_free_resources();
-        return 0;
+        // check whitelist
+        if (!usb_is_known_bluetooth_device(device_path)){
+            log_info("Class, Subclass, Protocol does not match Bluetooth device");
+            usb_free_resources();
+            return 0;
+        }
     }
 
 #ifdef ENABLE_SCO_OVER_HCI
@@ -969,7 +1004,7 @@ static int usb_try_open_device(const char * device_path){
 		usb_overlapped_sco_in[i].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 		// log_info_hexdump(&usb_overlapped_sco_in[i], sizeof(OVERLAPPED));
         // log_info("data source SCO in %u, handle %p", i, usb_overlapped_sco_in[i].hEvent);
-		usb_data_source_sco_in[i].handle = usb_overlapped_sco_in[i].hEvent;
+		usb_data_source_sco_in[i].source.handle = usb_overlapped_sco_in[i].hEvent;
 	    btstack_run_loop_set_data_source_handler(&usb_data_source_sco_in[i], &usb_process_sco_in);
         btstack_run_loop_add_data_source(&usb_data_source_sco_in[i]);
 	}
@@ -978,7 +1013,7 @@ static int usb_try_open_device(const char * device_path){
     for (i=0;i<SCO_RING_BUFFER_COUNT;i++){
         usb_overlapped_sco_out[i].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
         // log_info("data source SCO out %u, handle %p", i, usb_overlapped_sco_out[i].hEvent);
-        usb_data_source_sco_out[i].handle = usb_overlapped_sco_out[i].hEvent;
+        usb_data_source_sco_out[i].source.handle = usb_overlapped_sco_out[i].hEvent;
         btstack_run_loop_set_data_source_handler(&usb_data_source_sco_out[i], &usb_process_sco_out);
         btstack_run_loop_add_data_source(&usb_data_source_sco_out[i]);
     }
@@ -995,19 +1030,19 @@ static int usb_try_open_device(const char * device_path){
     usb_overlapped_acl_out.hEvent     = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	// setup btstack data soures
-    usb_data_source_event_in.handle = usb_overlapped_event_in.hEvent;
+    usb_data_source_event_in.source.handle = usb_overlapped_event_in.hEvent;
     btstack_run_loop_set_data_source_handler(&usb_data_source_event_in, &usb_process_event_in);
     btstack_run_loop_add_data_source(&usb_data_source_event_in);
 
-    usb_data_source_command_out.handle = usb_overlapped_command_out.hEvent;
+    usb_data_source_command_out.source.handle = usb_overlapped_command_out.hEvent;
     btstack_run_loop_set_data_source_handler(&usb_data_source_command_out, &usb_process_command_out);
     btstack_run_loop_add_data_source(&usb_data_source_command_out);
 
-    usb_data_source_acl_in.handle = usb_overlapped_acl_in.hEvent;
+    usb_data_source_acl_in.source.handle = usb_overlapped_acl_in.hEvent;
     btstack_run_loop_set_data_source_handler(&usb_data_source_acl_in, &usb_process_acl_in);
     btstack_run_loop_add_data_source(&usb_data_source_acl_in);
 
-    usb_data_source_acl_out.handle = usb_overlapped_acl_out.hEvent;
+    usb_data_source_acl_out.source.handle = usb_overlapped_acl_out.hEvent;
     btstack_run_loop_set_data_source_handler(&usb_data_source_acl_out, &usb_process_acl_out);
     btstack_run_loop_add_data_source(&usb_data_source_acl_out);
 
@@ -1024,7 +1059,7 @@ exit_on_error:
 
 #ifdef ENABLE_SCO_OVER_HCI
 
-#define WinUSB_Lookup(fn) do { fn = (fn##_t) GetProcAddress(h, #fn); log_info("%-30s %p", #fn, fn); if (!fn) return FALSE; } while(0)
+#define WinUSB_Lookup(fn) do { BTstack_##fn = (BTstack_##fn##_t) GetProcAddress(h, #fn); log_info("%-30s %p", #fn, BTstack_##fn); if (!BTstack_##fn) return FALSE; } while(0)
 
 static BOOL usb_lookup_symbols(void){
 	// lookup runtime symbols missing in current mingw64 distribution
@@ -1044,6 +1079,8 @@ static BOOL usb_lookup_symbols(void){
 
 // returns 0 on success, -1 otherwise
 static int usb_open(void){
+
+    if (usb_transport_open) return 0;
 
     int r = -1;
 
@@ -1168,13 +1205,20 @@ static int usb_open(void){
 
 	SetupDiDestroyDeviceInfoList(hDevInfo);
 
-	log_info("usb_open: done");
+	log_info("usb_open: done, r = %x", r);
+
+    if (r == 0){
+        // opened
+        usb_transport_open = 1;
+    }
 
     return r;    
 }
 
 static int usb_close(void){
     
+    if (!usb_transport_open == 0) return 0;
+
     // remove data sources
     btstack_run_loop_remove_data_source(&usb_data_source_command_out);
     btstack_run_loop_remove_data_source(&usb_data_source_event_in);
@@ -1191,6 +1235,8 @@ static int usb_close(void){
     }
 #endif
 
+    log_info("usb_close abort event and acl pipes");
+
     // stop transfers
     WinUsb_AbortPipe(usb_interface_0_handle, event_in_addr);
     WinUsb_AbortPipe(usb_interface_0_handle, acl_in_addr);
@@ -1202,13 +1248,20 @@ static int usb_close(void){
 
     // control transfer cannot be stopped, just wait for completion
     if (usb_command_out_active){
+        log_info("usb_close command out active, wait for complete");
         DWORD bytes_transferred;
         WinUsb_GetOverlappedResult(usb_interface_0_handle, &usb_overlapped_command_out, &bytes_transferred, TRUE);
         usb_command_out_active = 0;
     }
 
+    log_info("usb_close free resources");
+
     // free everything
     usb_free_resources();
+
+    // transport closed
+    usb_transport_open = 0;
+    
     return 0;    
 }
 
@@ -1285,7 +1338,7 @@ static int usb_send_sco_packet(uint8_t *packet, int size){
     // get current frame number
     ULONG current_frame_number;
     LARGE_INTEGER timestamp;
-    WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
+    BTstack_WinUsb_GetCurrentFrameNumber(usb_interface_0_handle, &current_frame_number, &timestamp);
 
     // store packet in free slot
     int transfer_index = sco_ring_write;
@@ -1295,7 +1348,7 @@ static int usb_send_sco_packet(uint8_t *packet, int size){
 
     // setup transfer
     int continue_stream = sco_ring_transfers_active > 0;
-    BOOL ok = WinUsb_WriteIsochPipeAsap(hci_sco_out_buffer_handle, transfer_index * SCO_PACKET_SIZE, size, continue_stream, &usb_overlapped_sco_out[transfer_index]);
+    BOOL ok = BTstack_WinUsb_WriteIsochPipeAsap(hci_sco_out_buffer_handle, transfer_index * SCO_PACKET_SIZE, size, continue_stream, &usb_overlapped_sco_out[transfer_index]);
     // log_info("usb_send_sco_packet: using slot #%02u, current frame %lu, continue stream %u, ok %u", transfer_index, current_frame_number, continue_stream, ok);
     if (!ok) {
         if (GetLastError() != ERROR_IO_PENDING) goto exit_on_error;
@@ -1377,7 +1430,11 @@ static const hci_transport_t hci_transport_usb = {
     /* int    (*send_packet)(...); */                               &usb_send_packet,
     /* int    (*set_baudrate)(uint32_t baudrate); */                NULL,
     /* void   (*reset_link)(void); */                               NULL,
+#ifdef ENABLE_SCO_OVER_HCI
     /* void   (*set_sco_config)(uint16_t voice_setting, int num_connections); */ usb_set_sco_config, 
+#else
+    /* void   (*set_sco_config)(uint16_t voice_setting, int num_connections); */ NULL, 
+#endif    
 };
 
 const hci_transport_t * hci_transport_usb_instance(void) {

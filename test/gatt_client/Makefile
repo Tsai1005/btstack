@@ -4,7 +4,7 @@ CC = g++
 
 BTSTACK_ROOT =  ../..
 
-CFLAGS  = -DUNIT_TEST -x c++ -g -Wall -Wnarrowing -Wconversion-null -I. -I../ -I${BTSTACK_ROOT}/src -I${BTSTACK_ROOT}/ble
+CFLAGS  = -DUNIT_TEST -x c++ -g -Wall -Wnarrowing -Wconversion-null -I. -I../ -I${BTSTACK_ROOT}/src
 LDFLAGS +=  -lCppUTest -lCppUTestExt
 
 VPATH += ${BTSTACK_ROOT}/src
@@ -34,11 +34,11 @@ all: gatt_client_test le_central
 profile.h: profile.gatt
 	python ${BTSTACK_ROOT}/tool/compile_gatt.py $< $@ 
 
-gatt_client_test: profile.h ${CORE_OBJ} ${COMMON_OBJ} gatt_client_test.o expected_results.h
-	${CC} ${CORE_OBJ} ${COMMON_OBJ} gatt_client_test.o ${CFLAGS} ${LDFLAGS} -o $@
+gatt_client_test: profile.h ${COMMON_OBJ} gatt_client_test.o expected_results.h
+	${CC} ${COMMON_OBJ} gatt_client_test.o ${CFLAGS} ${LDFLAGS} -o $@
 
-le_central: ${CORE_OBJ} ${COMMON_OBJ} le_central.o
-	${CC} ${CORE_OBJ} ${COMMON_OBJ} le_central.o ${CFLAGS} ${LDFLAGS} -o $@
+le_central: ${COMMON_OBJ} le_central.o
+	${CC} ${COMMON_OBJ} le_central.o ${CFLAGS} ${LDFLAGS} -o $@
 
 test: all
 	./gatt_client_test

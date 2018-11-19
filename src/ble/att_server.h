@@ -63,6 +63,14 @@ void att_server_init(uint8_t const * db, att_read_callback_t read_callback, att_
  */
 void att_server_register_packet_handler(btstack_packet_handler_t handler);
 
+/**
+ * @brief register read/write callbacks for specific handle range
+ * @param att_service_handler_t
+ */
+void att_server_register_service_handler(att_service_handler_t * handler);
+
+// the following functions will be removed soon
+
 /*
  * @brief tests if a notification or indication can be send right now
  * @param con_handle
@@ -70,7 +78,7 @@ void att_server_register_packet_handler(btstack_packet_handler_t handler);
  */
 int  att_server_can_send_packet_now(hci_con_handle_t con_handle);
 
-/** 
+/**
  * @brief Request emission of ATT_EVENT_CAN_SEND_NOW as soon as possible
  * @note ATT_EVENT_CAN_SEND_NOW might be emitted during call to this function
  *       so packet handler should be ready to handle it
@@ -78,13 +86,34 @@ int  att_server_can_send_packet_now(hci_con_handle_t con_handle);
  */
 void att_server_request_can_send_now_event(hci_con_handle_t con_handle);
 
-/** 
+/**
  * @brief Request callback when sending is possible
  * @note callback might happend during call to this function
  * @param callback_registration to point to callback function and context information
  * @param con_handle
+ * @return 0 if ok, error otherwise
  */
-void att_server_register_can_send_now_callback(btstack_context_callback_registration_t * callback_registration, hci_con_handle_t con_handle);
+int att_server_register_can_send_now_callback(btstack_context_callback_registration_t * callback_registration, hci_con_handle_t con_handle);
+
+// end of deprecated functions
+
+/**
+ * @brief Request callback when sending notifcation is possible
+ * @note callback might happend during call to this function
+ * @param callback_registration to point to callback function and context information
+ * @param con_handle
+ * @return 0 if ok, error otherwise
+ */
+int att_server_request_to_send_notification(btstack_context_callback_registration_t * callback_registration, hci_con_handle_t con_handle);
+
+/**
+ * @brief Request callback when sending indication is possible
+ * @note callback might happend during call to this function
+ * @param callback_registration to point to callback function and context information
+ * @param con_handle
+ * @return 0 if ok, error otherwise
+ */
+int att_server_request_to_send_indication(btstack_context_callback_registration_t * callback_registration, hci_con_handle_t con_handle);
 
 /*
  * @brief notify client about attribute value change
@@ -105,6 +134,17 @@ int att_server_notify(hci_con_handle_t con_handle, uint16_t attribute_handle, ui
  * @return 0 if ok, error otherwise
  */
 int att_server_indicate(hci_con_handle_t con_handle, uint16_t attribute_handle, uint8_t *value, uint16_t value_len);
+
+#ifdef ENABLE_ATT_DELAYED_RESPONSE
+/*
+ * @brief response ready - called after returning ATT_READ__RESPONSE_PENDING in an att_read_callback or
+ * ATT_ERROR_WRITE_REQUEST_PENDING IN att_write_callback before to trigger callback again and complete the transaction
+ * @nore The ATT Server will retry handling the current ATT request
+ * @param con_handle
+ * @return 0 if ok, error otherwise
+ */
+int att_server_response_ready(hci_con_handle_t con_handle);
+#endif
 
 /* API_END */
 

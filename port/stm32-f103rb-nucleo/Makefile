@@ -24,17 +24,20 @@ CORE = \
     btstack_run_loop_embedded.c \
 
 COMMON = \
-	bluetooth_init_cc2564B_1.5_BT_Spec_4.1.c   \
+	ad_parser.c 			 \
+	bluetooth_init_cc2564B_1.6_BT_Spec_4.1.c   \
 	btstack_chipset_cc256x.c   \
 	btstack_link_key_db_memory.c \
 	rfcomm.c			      \
 	sdp_client_rfcomm.c 		  \
     btstack_util.c			  \
+    btstack_crypto.c	      \
+    btstack_tlv.c	          \
     hci.c			          \
     hci_cmd.c		          \
     hci_dump.c		          \
     btstack_uart_block_embedded.c \
-    hci_transport_h4_ehcill_embedded.c \
+    hci_transport_h4.c        \
     l2cap.c			          \
     l2cap_signaling.c         \
     sdp_client.c              \

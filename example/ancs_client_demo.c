@@ -50,7 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <inttypes.h>
 
 #include "btstack_config.h"
 
@@ -98,7 +98,7 @@ static void app_packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *
                     printf("Just Works Confirmed.\n");
                     break;
                 case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
-                    printf("Passkey display: %06u.\n", sm_event_passkey_display_number_get_passkey(packet));
+                    printf("Passkey display: %"PRIu32"\n", sm_event_passkey_display_number_get_passkey(packet));
                     break;
             }
             break;
@@ -131,15 +131,11 @@ static void ancs_callback(uint8_t packet_type, uint16_t channel, uint8_t *packet
 
 int btstack_main(int argc, const char * argv[]);
 int btstack_main(int argc, const char * argv[]){
-    
-    UNUSED(argc);
+    (void)argc;
     (void)argv;
 
     printf("BTstack ANCS Client starting up...\n");
 
-    // register for HCI events
-    hci_event_callback_registration.callback = &app_packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
 
     // set up l2cap_le
     l2cap_init();
@@ -152,19 +148,28 @@ int btstack_main(int argc, const char * argv[]){
     sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_ONLY);
     sm_set_authentication_requirements( SM_AUTHREQ_BONDING ); 
 
+    // register for HCI events
+    hci_event_callback_registration.callback = &app_packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
     // register for SM events
     sm_event_callback_registration.callback = &app_packet_handler;
     sm_add_event_handler(&sm_event_callback_registration);
 
     // setup ATT server
     att_server_init(profile_data, NULL, NULL);    
+
+    // setup ANCS Client
+    ancs_client_init();
+
+
+    // register for ATT Serer events
     att_server_register_packet_handler(app_packet_handler);
 
     // setup GATT client
     gatt_client_init();
 
-    // setup ANCS Client
-    ancs_client_init();
+    // register for ancs events
     ancs_client_register_callback(&ancs_callback);
 
     // setup advertisements

@@ -60,7 +60,8 @@
 #include "bluetooth_company_id.h"
 #include "hci.h"
 #include "hci_dump.h"
-#include "stdin_support.h"
+#include "btstack_stdin.h"
+#include "btstack_tlv_posix.h"
 
 #include "btstack_chipset_bcm.h"
 #include "btstack_chipset_csr.h"
@@ -70,6 +71,12 @@
 #include "btstack_chipset_tc3566x.h"
 
 int is_bcm;
+
+#define TLV_DB_PATH_PREFIX "/tmp/btstack_"
+#define TLV_DB_PATH_POSTFIX ".tlv"
+static char tlv_db_path[100];
+static const btstack_tlv_t * tlv_impl;
+static btstack_tlv_posix_t   tlv_context;
 
 int btstack_main(int argc, const char * argv[]);
 static void local_version_information_handler(uint8_t * packet);
@@ -92,6 +99,12 @@ static void packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *pack
             if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
             gap_local_bd_addr(addr);
             printf("BTstack up and running at %s\n",  bd_addr_to_str(addr));
+            // setup TLV
+            strcpy(tlv_db_path, TLV_DB_PATH_PREFIX);
+            strcat(tlv_db_path, bd_addr_to_str(addr));
+            strcat(tlv_db_path, TLV_DB_PATH_POSTFIX);
+            tlv_impl = btstack_tlv_posix_init_instance(&tlv_context, tlv_db_path);
+            btstack_tlv_set_instance(tlv_impl, &tlv_context);
             break;
         case HCI_EVENT_COMMAND_COMPLETE:
             if (HCI_EVENT_IS_COMMAND_COMPLETE(packet, hci_read_local_name)){
@@ -148,9 +161,9 @@ static void use_fast_uart(void){
 
 static void local_version_information_handler(uint8_t * packet){
     printf("Local version information:\n");
-    uint16_t hci_version    = little_endian_read_16(packet, 4);
-    uint16_t hci_revision   = little_endian_read_16(packet, 6);
-    uint16_t lmp_version    = little_endian_read_16(packet, 8);
+    uint16_t hci_version    = packet[6];
+    uint16_t hci_revision   = little_endian_read_16(packet, 7);
+    uint16_t lmp_version    = packet[9];
     uint16_t manufacturer   = little_endian_read_16(packet, 10);
     uint16_t lmp_subversion = little_endian_read_16(packet, 12);
     printf("- HCI Version    0x%04x\n", hci_version);
@@ -196,10 +209,16 @@ static void local_version_information_handler(uint8_t * packet){
         case BLUETOOTH_COMPANY_ID_EM_MICROELECTRONIC_MARIN_SA:
             printf("EM Microelectronics - using EM9301 driver.\n");
             hci_set_chipset(btstack_chipset_em9301_instance());
+            use_fast_uart();
             break;
         case BLUETOOTH_COMPANY_ID_NORDIC_SEMICONDUCTOR_ASA:
             printf("Nordic Semiconductor nRF5 chipset.\n");
             break;        
+        case BLUETOOTH_COMPANY_ID_TOSHIBA_CORP:
+            printf("Toshiba - using TC3566x driver.\n");
+            hci_set_chipset(btstack_chipset_tc3566x_instance());
+            use_fast_uart();
+            break;
         default:
             printf("Unknown manufacturer / manufacturer not supported yet.\n");
             break;
@@ -213,13 +232,23 @@ int main(int argc, const char * argv[]){
     btstack_run_loop_init(btstack_run_loop_posix_get_instance());
 	    
     // use logger: format HCI_DUMP_PACKETLOGGER, HCI_DUMP_BLUEZ or HCI_DUMP_STDOUT
-    hci_dump_open("/tmp/hci_dump.pklg", HCI_DUMP_PACKETLOGGER);
+    const char * pklg_path = "/tmp/hci_dump.pklg";
+    hci_dump_open(pklg_path, HCI_DUMP_PACKETLOGGER);
+    printf("Packet Log: %s\n", pklg_path);
 
     // pick serial port
     // config.device_name = "/dev/tty.usbserial-A900K2WS"; // DFROBOT
     // config.device_name = "/dev/tty.usbserial-A50285BI"; // BOOST-CC2564MODA New
     // config.device_name = "/dev/tty.usbserial-A9OVNX5P"; // RedBear IoT pHAT breakout board
     config.device_name = "/dev/tty.usbserial-A900K0VK"; // CSR8811 breakout board
+
+    // accept path from command line
+    if (argc >= 3 && strcmp(argv[1], "-u") == 0){
+        config.device_name = argv[2];
+        argc -= 2;
+        memmove(&argv[1], &argv[3], (argc-1) * sizeof(char *));
+    }
+    printf("H4 device: %s\n", config.device_name);
 
     // init HCI
     const btstack_uart_block_t * uart_driver = btstack_uart_block_posix_instance();

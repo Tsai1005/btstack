@@ -42,18 +42,26 @@
 #include <stdint.h>
 #include "bluetooth.h"
 #include "btstack_linked_list.h"
+#include "btstack_defines.h"
 
 #if defined __cplusplus
 extern "C" {
 #endif
 
 // custom BTstack error codes
-#define ATT_ERROR_HCI_DISCONNECT_RECEIVED          0x1f
+#define ATT_ERROR_HCI_DISCONNECT_RECEIVED         0x1f
 
 // custom BTstack ATT error codes
-#define ATT_ERROR_DATA_MISMATCH                    0x7e
-#define ATT_ERROR_TIMEOUT                          0x7F
-    
+#define ATT_ERROR_DATA_MISMATCH                   0x7e
+#define ATT_ERROR_TIMEOUT                         0x7F
+#define ATT_ERROR_WRITE_RESPONSE_PENDING         0x100
+
+// custom BTstack ATT Response Pending for att_read_callback
+#define ATT_READ_RESPONSE_PENDING                 0xffff
+
+// internally used to signal write response pending
+#define ATT_INTERNAL_WRITE_RESPONSE_PENDING       0xfffe
+
 typedef struct att_connection {
     hci_con_handle_t con_handle;
     uint16_t mtu;       // initialized to ATT_DEFAULT_MTU (23), negotiated during MTU exchange
@@ -66,6 +74,7 @@ typedef struct att_connection {
 // ATT Client Read Callback for Dynamic Data
 // - if buffer == NULL, don't copy data, just return size of value
 // - if buffer != NULL, copy data and return number bytes copied
+// If ENABLE_ATT_DELAYED_READ_RESPONSE is defined, you may return ATT_READ_RESPONSE_PENDING if data isn't available yet
 // @param con_handle of hci le connection
 // @param attribute_handle to be read
 // @param offset defines start of attribute value
@@ -76,22 +85,30 @@ typedef uint16_t (*att_read_callback_t)(hci_con_handle_t con_handle, uint16_t at
 // ATT Client Write Callback for Dynamic Data
 // @param con_handle of hci le connection
 // @param attribute_handle to be written
-// @param transaction - ATT_TRANSACTION_MODE_NONE for regular writes, ATT_TRANSACTION_MODE_ACTIVE for prepared writes and ATT_TRANSACTION_MODE_EXECUTE
+// @param transaction - ATT_TRANSACTION_MODE_NONE for regular writes. For prepared writes: ATT_TRANSACTION_MODE_ACTIVE, ATT_TRANSACTION_MODE_VALIDATE, ATT_TRANSACTION_MODE_EXECUTE, ATT_TRANSACTION_MODE_CANCEL
 // @param offset into the value - used for queued writes and long attributes
 // @param buffer 
 // @param buffer_size
 // @param signature used for signed write commmands
 // @returns 0 if write was ok, ATT_ERROR_PREPARE_QUEUE_FULL if no space in queue, ATT_ERROR_INVALID_OFFSET if offset is larger than max buffer
+//
+// Each Prepared Write Request triggers a callback with transaction mode ATT_TRANSACTION_MODE_ACTIVE.
+// On Execute Write, the callback will be called with ATT_TRANSACTION_MODE_VALIDATE and allows to validate all queued writes and return an application error.
+// If none of the registered callbacks return an error for ATT_TRANSACTION_MODE_VALIDATE and the callback will be called with ATT_TRANSACTION_MODE_EXECUTE.
+// Otherwise, all callbacks will be called with ATT_TRANSACTION_MODE_CANCEL.
+//
+// If the additional validation step is not needed, just return 0 for all callbacks with transaction mode ATT_TRANSACTION_MODE_VALIDATE.
+//
 typedef int (*att_write_callback_t)(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t transaction_mode, uint16_t offset, uint8_t *buffer, uint16_t buffer_size);
-
 
 // Read & Write Callbacks for handle range
 typedef struct att_service_handler {
-  btstack_linked_item_t * item;
-  uint16_t start_handle;
-  uint16_t end_handle;
-  att_read_callback_t read_callback;
-  att_write_callback_t write_callback;
+    btstack_linked_item_t * item;
+    uint16_t start_handle;
+    uint16_t end_handle;
+    att_read_callback_t read_callback;
+    att_write_callback_t write_callback;
+    btstack_packet_handler_t packet_handler;
 } att_service_handler_t;
 
 // MARK: ATT Operations
@@ -123,7 +140,8 @@ void att_dump_attributes(void);
  * @param att_connection used for mtu and security properties
  * @param request_buffer, request_len: ATT request from clinet
  * @param response_buffer for result
- * @returns len of data in response buffer. 0 = no response
+ * @returns len of data in response buffer. 0 = no response, 
+ *          ATT_READ_RESPONSE_PENDING if it was returned at least once for dynamic data (requires ENABLE_ATT_DELAYED_READ_RESPONSE)
  */
 uint16_t att_handle_request(att_connection_t * att_connection,
                             uint8_t * request_buffer,
@@ -163,14 +181,52 @@ uint16_t att_prepare_handle_value_indication(att_connection_t * att_connection,
  */
 void att_clear_transaction_queue(att_connection_t * att_connection);
 
-/**
- * @brief register read/write callbacks for specific handle range
- * @param att_service_handler_t
+// att_read_callback helpers for a various data types
+
+/*
+ * @brief Handle read of blob like data for att_read_callback
+ * @param blob of data
+ * @param blob_size of blob
+ * @param offset from att_read_callback
+ * @param buffer from att_read_callback
+ * @param buffer_size from att_read_callback
+ * @returns value size for buffer == 0 and num bytes copied otherwise
  */
-void att_register_service_handler(att_service_handler_t * handler);
+uint16_t att_read_callback_handle_blob(const uint8_t * blob, uint16_t blob_size, uint16_t offset, uint8_t * buffer, uint16_t buffer_size);
+
+/*
+ * @brief Handle read of little endian unsigned 32 bit value for att_read_callback
+ * @param value
+ * @param offset from att_read_callback
+ * @param buffer from att_read_callback
+ * @param buffer_size from att_read_callback
+ * @returns value size for buffer == 0 and num bytes copied otherwise
+ */
+uint16_t att_read_callback_handle_little_endian_32(uint32_t value, uint16_t offset, uint8_t * buffer, uint16_t buffer_size);
+
+/*
+ * @brief Handle read of little endian unsigned 16 bit value for att_read_callback
+ * @param value
+ * @param offset from att_read_callback
+ * @param buffer from att_read_callback
+ * @param buffer_size from att_read_callback
+ * @returns value size for buffer == 0 and num bytes copied otherwise
+ */
+uint16_t att_read_callback_handle_little_endian_16(uint16_t value, uint16_t offset, uint8_t * buffer, uint16_t buffer_size);
+
+/*
+ * @brief Handle read of single byte for att_read_callback
+ * @param blob of data
+ * @param blob_size of blob
+ * @param offset from att_read_callback
+ * @param buffer from att_read_callback
+ * @param buffer_size from att_read_callback
+ * @returns value size for buffer == 0 and num bytes copied otherwise
+ */
+uint16_t att_read_callback_handle_byte(uint8_t value, uint16_t offset, uint8_t * buffer, uint16_t buffer_size);
 
 
- // experimental client API
+// experimental client API
 uint16_t att_uuid_for_handle(uint16_t attribute_handle);
 
 
@@ -184,6 +240,26 @@ uint16_t gatt_server_get_value_handle_for_characteristic_with_uuid16(uint16_t st
 
 // returns 0 if not found
 uint16_t gatt_server_get_client_configuration_handle_for_characteristic_with_uuid16(uint16_t start_handle, uint16_t end_handle, uint16_t uuid16);
+
+
+// returns 1 if service found. only primary service.
+int gatt_server_get_get_handle_range_for_service_with_uuid128(const uint8_t * uuid128, uint16_t * start_handle, uint16_t * end_handle);
+
+// returns 0 if not found
+uint16_t gatt_server_get_value_handle_for_characteristic_with_uuid128(uint16_t start_handle, uint16_t end_handle, const uint8_t * uuid128);
+
+// returns 0 if not found
+uint16_t gatt_server_get_client_configuration_handle_for_characteristic_with_uuid128(uint16_t start_handle, uint16_t end_handle, const uint8_t * uuid128);
+
+// non-user functionality for att_server
+
+/*
+ * @brief Check if writes to handle should be persistent
+ * @param handle
+ * @returns 1 if persistent
+ */
+int att_is_persistent_ccc(uint16_t handle);
+
 
 #if defined __cplusplus
 }

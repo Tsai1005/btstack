@@ -61,7 +61,7 @@
 #include "hci.h"
 #include "hci_dump.h"
 #include "l2cap.h"
-#include "stdin_support.h"
+#include "btstack_stdin.h"
  
 #define HEARTBEAT_PERIOD_MS 1000
 
@@ -301,6 +301,7 @@ static void app_run(void){
 // @param offset defines start of attribute value
 static uint16_t att_read_callback(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t offset, uint8_t * buffer, uint16_t buffer_size){
 
+    UNUSED(con_handle);
     printf("READ Callback, handle %04x, offset %u, buffer size %u\n", attribute_handle, offset, buffer_size);
     uint16_t  att_value_len;
 
@@ -379,6 +380,7 @@ static uint16_t att_read_callback(hci_con_handle_t con_handle, uint16_t attribut
 
 // write requests
 static int att_write_callback(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t transaction_mode, uint16_t offset, uint8_t *buffer, uint16_t buffer_size){
+    UNUSED(con_handle);
     printf("WRITE Callback, handle %04x, mode %u, offset %u, data: ", attribute_handle, transaction_mode, offset);
     printf_hexdump(buffer, buffer_size);
 
@@ -540,6 +542,8 @@ static void gap_run(void){
 }
 
 static void app_packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
+    UNUSED(channel);
+    UNUSED(size);
     bd_addr_t event_address;
     switch (packet_type) {
             
@@ -710,16 +714,14 @@ static void update_auth_req(void){
     sm_set_authentication_requirements(auth_req);
 }
 
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    char buffer;
-    read(ds->fd, &buffer, 1);
+static void stdin_process(char c){
 
     // passkey input
     if (ui_digits_for_passkey){
-        if (buffer < '0' || buffer > '9') return;
-        printf("%c", buffer);
+        if (c < '0' || c > '9') return;
+        printf("%c", c);
         fflush(stdout);
-        ui_passkey = ui_passkey * 10 + buffer - '0';
+        ui_passkey = ui_passkey * 10 + c - '0';
         ui_digits_for_passkey--;
         if (ui_digits_for_passkey == 0){
             printf("\nSending Passkey '%06x'\n", ui_passkey);
@@ -728,7 +730,7 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
         return;
     }
 
-    switch (buffer){
+    switch (c){
         case 'a':
             gap_advertisements = 0;
             update_advertisements();
@@ -799,7 +801,7 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
         case '8':
         case '9':
         case '0':
-            advertisement_index = buffer - '0';
+            advertisement_index = c - '0';
             update_advertisements();
             break;
         case '+':
@@ -932,7 +934,9 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
     return;
 }
 
-static int get_oob_data_callback(uint8_t addres_type, bd_addr_t addr, uint8_t * oob_data){
+static int get_oob_data_callback(uint8_t address_type, bd_addr_t addr, uint8_t * oob_data){
+    UNUSED(address_type);
+    (void)addr;
     if(!sm_have_oob_data) return 0;
     memcpy(oob_data, sm_oob_data, 16);
     return 1;
@@ -940,7 +944,9 @@ static int get_oob_data_callback(uint8_t addres_type, bd_addr_t addr, uint8_t * 
 
 int btstack_main(int argc, const char * argv[]);
 int btstack_main(int argc, const char * argv[]){
-    
+    (void) argv;
+    (void) argc;
+
     printf("BTstack LE Peripheral starting up...\n");
 
     // set up l2cap_le

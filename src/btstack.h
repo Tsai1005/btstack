@@ -46,20 +46,24 @@
 
 #include "btstack_config.h"
 
+#include "ad_parser.h"
 #include "bluetooth.h"
+#include "bluetooth_company_id.h"
 #include "bluetooth_data_types.h"
 #include "bluetooth_gatt.h"
 #include "bluetooth_sdp.h"
-#include "bluetooth_company_id.h"
-#include "ad_parser.h"
+#include "btstack_audio.h"
 #include "btstack_control.h"
 #include "btstack_debug.h"
-#include "btstack_event.h"
 #include "btstack_defines.h"
+#include "btstack_event.h"
+#include "btstack_hid_parser.h"
 #include "btstack_linked_list.h"
 #include "btstack_memory.h"
 #include "btstack_memory_pool.h"
+#include "btstack_network.h"
 #include "btstack_run_loop.h"
+#include "btstack_stdin.h"
 #include "btstack_util.h"
 #include "gap.h"
 #include "hci.h"
@@ -80,13 +84,29 @@
 #include "ble/sm.h"
 #endif
 
-// #ifdef HAVE_CLASSIC
+#ifdef ENABLE_CLASSIC
+#include "classic/a2dp_sink.h"
+#include "classic/a2dp_source.h"
+#include "classic/avdtp.h"
+#include "classic/avdtp_acceptor.h"
+#include "classic/avdtp_initiator.h"
+#include "classic/avdtp_sink.h"
+#include "classic/avdtp_source.h"
+#include "classic/avdtp_util.h"
+#include "classic/avrcp.h"
+#include "classic/avrcp_browsing_controller.h"
+#include "classic/avrcp_browsing_target.h"
+#include "classic/avrcp_controller.h"
+#include "classic/avrcp_media_item_iterator.h"
+#include "classic/avrcp_target.h"
 #include "classic/bnep.h"
 #include "classic/btstack_link_key_db.h"
+#include "classic/btstack_sbc.h"
 #include "classic/device_id_server.h"
 #include "classic/hfp.h"
 #include "classic/hfp_ag.h"
 #include "classic/hfp_hf.h"
+#include "classic/hid_device.h"
 #include "classic/hsp_ag.h"
 #include "classic/hsp_hs.h"
 #include "classic/pan.h"
@@ -96,7 +116,7 @@
 #include "classic/sdp_server.h"
 #include "classic/sdp_util.h"
 #include "classic/spp_server.h"
-// #endif
+#endif
 
 #endif  // __BTSTACK_H
  

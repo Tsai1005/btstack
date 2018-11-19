@@ -1172,7 +1172,7 @@ static int bnep_handle_control_packet(bnep_channel_t *channel, uint8_t *packet, 
  */
 static int bnep_hci_event_handler(uint8_t *packet, uint16_t size)
 {
-    UNUSED(size);
+    UNUSED(size);   // ok: handling own l2cap events
 
     bd_addr_t event_addr;
     uint16_t  psm;
@@ -1445,7 +1445,7 @@ void bnep_packet_handler(uint8_t packet_type, uint16_t l2cap_cid, uint8_t *packe
 
 static void bnep_channel_state_machine(bnep_channel_t* channel, bnep_channel_event_t *event)
 {
-    log_info("bnep_state_machine: state %u, state var: %02x, event %u", channel->state, channel->state_var, event->type);
+    log_debug("bnep_state_machine: state %u, state var: %02x, event %u", channel->state, channel->state_var, event->type);
  
     if (event->type == BNEP_CH_EVT_READY_TO_SEND) {
         /* Send outstanding packets. */
@@ -1537,7 +1537,7 @@ static void bnep_handle_can_send_now(uint16_t l2cap_cid){
 /* BNEP BTStack API */
 void bnep_init(void)
 {
-    bnep_security_level = LEVEL_0;
+    bnep_security_level = LEVEL_2;
 }
 
 void bnep_set_required_security_level(gap_security_level_t security_level)

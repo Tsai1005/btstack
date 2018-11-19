@@ -8,23 +8,24 @@ CPPUTEST_HOME = ${BTSTACK_ROOT}/test/cpputest
 include ${BTSTACK_ROOT}/example/Makefile.inc
 
 COMMON = \
-	sdp_server.c			            \
-	sdp_client_rfcomm.c		    \
+	ad_parser.c 				 \
+	sdp_server.c			     \
+	sdp_client_rfcomm.c		     \
     btstack_link_key_db_memory.c \
-    btstack_linked_list.c	    \
-    btstack_memory.c            \
-    btstack_memory_pool.c       \
-    btstack_run_loop.c		    \
-    btstack_run_loop_posix.c    \
-    btstack_util.c			    \
-    hci.c			            \
-    hci_cmd.c		            \
-    hci_dump.c		            \
-    l2cap.c			            \
-    l2cap_signaling.c 			\
-    rfcomm.c			        \
-    sdp_client.c		        \
-    sdp_util.c	                \
+    btstack_linked_list.c	     \
+    btstack_memory.c             \
+    btstack_memory_pool.c        \
+    btstack_run_loop.c		     \
+    btstack_run_loop_posix.c     \
+    btstack_util.c			     \
+    hci.c			             \
+    hci_cmd.c		             \
+    hci_dump.c		             \
+    l2cap.c			             \
+    l2cap_signaling.c 			 \
+    rfcomm.c			         \
+    sdp_client.c		         \
+    sdp_util.c	                 \
 
 
 MOCK = \
@@ -53,7 +54,7 @@ VPATH += ${BTSTACK_ROOT}/src
 VPATH += ${BTSTACK_ROOT}/src/classic
 VPATH += ${BTSTACK_ROOT}/platform/posix
 
-CFLAGS  = -g -Wall -I. -I../ -I${BTSTACK_ROOT}/src -I${BTSTACK_ROOT}/src/classic -I${POSIX_ROOT} -I${BTSTACK_ROOT}/include -I${BTSTACK_ROOT}/ble
+CFLAGS  = -g -Wall -I. -I../ -I${BTSTACK_ROOT}/src -I${BTSTACK_ROOT}/src/classic -I${POSIX_ROOT} -I${BTSTACK_ROOT}/include
 LDFLAGS += -lCppUTest -lCppUTestExt
 
 EXAMPLES = hfp_ag_parser_test hfp_ag_client_test hfp_hf_parser_test hfp_hf_client_test cvsd_plc_test

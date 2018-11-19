@@ -59,7 +59,7 @@
 #include "hci.h"
 #include "hci_dump.h"
 #include "l2cap.h"
-#include "stdin_support.h"
+#include "btstack_stdin.h"
  
  static void show_usage(void);
 
@@ -90,7 +90,8 @@ const char * data_classic = "ABCDEF";
 static int todo_send_short;
 static int todo_send_long;
 
-static uint8_t buffer_x[1000];
+// note: must be smaller than TSPX_tester_mtu for l2cap/le/cfc/bv-02-c to succeed
+static uint8_t buffer_x[500];
 
 static uint16_t cid_le;
 static uint16_t cid_classic;
@@ -293,11 +294,7 @@ void show_usage(void){
     printf("---\n");
 }
 
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    UNUSED(callback_type);
-    char buffer;
-    read(ds->fd, &buffer, 1);
-
+static void stdin_process(char buffer){
     // passkey input
     if (ui_digits_for_passkey){
         if (buffer < '0' || buffer > '9') return;
@@ -325,7 +322,7 @@ static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callbac
                                     sizeof(buffer_x), L2CAP_LE_AUTOMATIC_CREDITS, LEVEL_0, &cid_le);
             break;
 
-        case 'A':
+        case 'B':
             printf("Creating connection to %s 0x%02x - LE\n", bd_addr_to_str(pts_address), TSPX_psm_unsupported);
             l2cap_le_create_channel(&app_packet_handler, handle_le, TSPX_psm_unsupported, buffer_x, 
                                     sizeof(buffer_x), L2CAP_LE_AUTOMATIC_CREDITS, LEVEL_0, &cid_le);

@@ -89,15 +89,19 @@ static void btstack_uart_posix_process_write(btstack_data_source_t *ds) {
     uint32_t start = btstack_run_loop_get_time_ms();
 
     // write up to write_bytes_len to fd
-    int bytes_written = (int) write(ds->fd, write_bytes_data, write_bytes_len);
-    if (bytes_written < 0) {
-        btstack_run_loop_enable_data_source_callbacks(ds, DATA_SOURCE_CALLBACK_WRITE);
-        return;
-    }
-
+    int bytes_written = (int) write(ds->source.fd, write_bytes_data, write_bytes_len);
     uint32_t end = btstack_run_loop_get_time_ms();
     if (end - start > 10){
-        log_info("h4_process: write took %u ms", end - start);
+        log_info("write took %u ms", end - start);
+    }
+    if (bytes_written == 0){
+        log_error("wrote zero bytes\n");
+        return;
+    }
+    if (bytes_written < 0) {
+        log_error("write returned error\n");
+        btstack_run_loop_enable_data_source_callbacks(ds, DATA_SOURCE_CALLBACK_WRITE);
+        return;
     }
 
     write_bytes_data += bytes_written;
@@ -119,21 +123,28 @@ static void btstack_uart_posix_process_write(btstack_data_source_t *ds) {
 static void btstack_uart_posix_process_read(btstack_data_source_t *ds) {
 
     if (read_bytes_len == 0) {
-        log_info("btstack_uart_posix_process_read but no read requested");
+        log_info("called but no read pending");
         btstack_run_loop_disable_data_source_callbacks(ds, DATA_SOURCE_CALLBACK_READ);
     }
 
     uint32_t start = btstack_run_loop_get_time_ms();
     
     // read up to bytes_to_read data in
-    ssize_t bytes_read = read(ds->fd, read_bytes_data, read_bytes_len);
+    ssize_t bytes_read = read(ds->source.fd, read_bytes_data, read_bytes_len);
     // log_info("btstack_uart_posix_process_read need %u bytes, got %d", read_bytes_len, (int) bytes_read);
     uint32_t end = btstack_run_loop_get_time_ms();
     if (end - start > 10){
-        log_info("h4_process: read took %u ms", end - start);
+        log_info("read took %u ms", end - start);
     }
-    if (bytes_read < 0) return;
-    
+    if (bytes_read == 0){
+        log_error("read zero bytes\n");
+        return;
+    }
+    if (bytes_read < 0) {
+        log_error("read returned error\n");
+        return;
+    }
+
     read_bytes_len   -= bytes_read;
     read_bytes_data  += bytes_read;
     if (read_bytes_len > 0) return;
@@ -145,8 +156,8 @@ static void btstack_uart_posix_process_read(btstack_data_source_t *ds) {
     }
 }
 
-static void hci_transport_h5_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type) {
-    if (ds->fd < 0) return;
+static void hci_uart_posix_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type) {
+    if (ds->source.fd < 0) return;
     switch (callback_type){
         case DATA_SOURCE_CALLBACK_READ:
             btstack_uart_posix_process_read(ds);
@@ -161,7 +172,7 @@ static void hci_transport_h5_process(btstack_data_source_t *ds, btstack_data_sou
 
 static int btstack_uart_posix_set_baudrate(uint32_t baudrate){
 
-    int fd = transport_data_source.fd;
+    int fd = transport_data_source.source.fd;
 
     log_info("h4_set_baudrate %u", baudrate);
 
@@ -237,6 +248,57 @@ static int btstack_uart_posix_set_baudrate(uint32_t baudrate){
     return 0;
 }
 
+static void btstack_uart_posix_set_parity_option(struct termios * toptions, int parity){
+    if (parity){
+        // enable even parity
+        toptions->c_cflag |= PARENB;
+    } else {
+        // disable even parity
+        toptions->c_cflag &= ~PARENB;
+    }
+}
+
+static void btstack_uart_posix_set_flowcontrol_option(struct termios * toptions, int flowcontrol){
+    if (flowcontrol) {
+        // with flow control
+        toptions->c_cflag |= CRTSCTS;
+    } else {
+        // no flow control
+        toptions->c_cflag &= ~CRTSCTS;
+    }
+}
+
+static int btstack_uart_posix_set_parity(int parity){
+    int fd = transport_data_source.source.fd;
+    struct termios toptions;
+    if (tcgetattr(fd, &toptions) < 0) {
+        log_error("btstack_uart_posix_set_parity: Couldn't get term attributes");
+        return -1;
+    }
+    btstack_uart_posix_set_parity_option(&toptions, parity);
+    if(tcsetattr(fd, TCSANOW, &toptions) < 0) {
+        log_error("posix_set_parity: Couldn't set term attributes");
+        return -1;
+    }
+    return 0;
+}
+
+
+static int btstack_uart_posix_set_flowcontrol(int flowcontrol){
+    int fd = transport_data_source.source.fd;
+    struct termios toptions;
+    if (tcgetattr(fd, &toptions) < 0) {
+        log_error("btstack_uart_posix_set_parity: Couldn't get term attributes");
+        return -1;
+    }
+    btstack_uart_posix_set_flowcontrol_option(&toptions, flowcontrol);
+    if(tcsetattr(fd, TCSANOW, &toptions) < 0) {
+        log_error("posix_set_flowcontrol: Couldn't set term attributes");
+        return -1;
+    }
+    return 0;
+}
+
 static int btstack_uart_posix_open(void){
 
     const char * device_name = uart_config->device_name;
@@ -262,18 +324,6 @@ static int btstack_uart_posix_open(void){
     toptions.c_cflag &= ~CSTOPB;
     toptions.c_cflag |= CS8;
 
-    // 8E1
-    // toptions.c_cflag |= PARENB; // enable even parity
-    //
-
-    if (flowcontrol) {
-        // with flow control
-        toptions.c_cflag |= CRTSCTS;
-    } else {
-        // no flow control
-        toptions.c_cflag &= ~CRTSCTS;
-    }
-    
     toptions.c_cflag |= CREAD | CLOCAL;  // turn on READ & ignore ctrl lines
     toptions.c_iflag &= ~(IXON | IXOFF | IXANY); // turn off s/w flow ctrl
     
@@ -281,13 +331,19 @@ static int btstack_uart_posix_open(void){
     toptions.c_cc[VMIN]  = 1;
     toptions.c_cc[VTIME] = 0;
     
+    // no parity
+    btstack_uart_posix_set_parity_option(&toptions, 0);
+
+    // flowcontrol
+    btstack_uart_posix_set_flowcontrol_option(&toptions, flowcontrol);
+
     if(tcsetattr(fd, TCSANOW, &toptions) < 0) {
         log_error("posix_open: Couldn't set term attributes");
         return -1;
     }
 
     // store fd in data source
-    transport_data_source.fd = fd;
+    transport_data_source.source.fd = fd;
     
     // also set baudrate
     if (btstack_uart_posix_set_baudrate(baudrate) < 0){
@@ -296,8 +352,11 @@ static int btstack_uart_posix_open(void){
 
     // set up data_source
     btstack_run_loop_set_data_source_fd(&transport_data_source, fd);
-    btstack_run_loop_set_data_source_handler(&transport_data_source, &hci_transport_h5_process);
+    btstack_run_loop_set_data_source_handler(&transport_data_source, &hci_uart_posix_process);
     btstack_run_loop_add_data_source(&transport_data_source);
+
+    // wait a bit - at least cheap FTDI232 clones might send the first byte out incorrectly
+    usleep(100000);
 
     return 0;
 } 
@@ -308,8 +367,8 @@ static int btstack_uart_posix_close_new(void){
     btstack_run_loop_remove_data_source(&transport_data_source);
     
     // then close device 
-    close(transport_data_source.fd);
-    transport_data_source.fd = -1;
+    close(transport_data_source.source.fd);
+    transport_data_source.source.fd = -1;
     return 0;
 }
 
@@ -319,27 +378,6 @@ static void btstack_uart_posix_set_block_received( void (*block_handler)(void)){
 
 static void btstack_uart_posix_set_block_sent( void (*block_handler)(void)){
     block_sent = block_handler;
-}
-
-static int btstack_uart_posix_set_parity(int parity){
-
-    int fd = transport_data_source.fd;
-
-    struct termios toptions;
-    if (tcgetattr(fd, &toptions) < 0) {
-        log_error("btstack_uart_posix_set_parity: Couldn't get term attributes");
-        return -1;
-    }
-    if (parity){
-        toptions.c_cflag |= PARENB; // enable even parity
-    } else {
-        toptions.c_cflag &= ~PARENB; // enable even parity
-    }
-    if(tcsetattr(fd, TCSANOW, &toptions) < 0) {
-        log_error("posix_set_parity: Couldn't set term attributes");
-        return -1;
-    }
-    return 0;
 }
 
 static void btstack_uart_posix_send_block(const uint8_t *data, uint16_t size){
@@ -374,10 +412,12 @@ static const btstack_uart_block_t btstack_uart_posix = {
     /* void (*set_block_sent)(void (*handler)(void)); */              &btstack_uart_posix_set_block_sent,
     /* int  (*set_baudrate)(uint32_t baudrate); */                    &btstack_uart_posix_set_baudrate,
     /* int  (*set_parity)(int parity); */                             &btstack_uart_posix_set_parity,
+    /* int  (*set_flowcontrol)(int flowcontrol); */                   &btstack_uart_posix_set_flowcontrol,
     /* void (*receive_block)(uint8_t *buffer, uint16_t len); */       &btstack_uart_posix_receive_block,
     /* void (*send_block)(const uint8_t *buffer, uint16_t length); */ &btstack_uart_posix_send_block,
     /* int (*get_supported_sleep_modes); */                           NULL,
-    /* void (*set_sleep)(btstack_uart_sleep_mode_t sleep_mode); */    NULL
+    /* void (*set_sleep)(btstack_uart_sleep_mode_t sleep_mode); */    NULL,
+    /* void (*set_wakeup_handler)(void (*handler)(void)); */          NULL,
 };
 
 const btstack_uart_block_t * btstack_uart_block_posix_instance(void){

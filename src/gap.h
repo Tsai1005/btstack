@@ -44,7 +44,8 @@ extern "C" {
 
 #include "btstack_defines.h"
 #include "btstack_util.h"
-	
+#include "classic/btstack_link_key_db.h"
+
 typedef enum {
 
 	// MITM protection not required
@@ -103,6 +104,15 @@ typedef enum {
     GAP_RANDOM_ADDRESS_RESOLVABLE,
 } gap_random_address_type_t;
 
+// Authorization state
+typedef enum {
+    AUTHORIZATION_UNKNOWN,
+    AUTHORIZATION_PENDING,
+    AUTHORIZATION_DECLINED,
+    AUTHORIZATION_GRANTED
+} authorization_state_t;
+
+
 /* API_START */
 
 // Classic + LE
@@ -125,14 +135,18 @@ gap_connection_type_t gap_get_connection_type(hci_con_handle_t connection_handle
 /** 
  * @brief Sets local name.
  * @note has to be done before stack starts up
+ * @note Default name is 'BTstack 00:00:00:00:00:00'
+ * @note '00:00:00:00:00:00' in local_name will be replaced with actual bd addr
  * @param name is not copied, make sure memory is accessible during stack startup
  */
 void gap_set_local_name(const char * local_name);
 
 /**
  * @brief Set Extended Inquiry Response data
- * @param eir_data size 240 bytes, is not copied make sure memory is accessible during stack startup
  * @note has to be done before stack starts up
+ * @note If not set, local name will be used for EIR data (see gap_set_local_name)
+ * @note '00:00:00:00:00:00' in local_name will be replaced with actual bd addr
+ * @param eir_data size 240 bytes, is not copied make sure memory is accessible during stack startup
  */
 void gap_set_extended_inquiry_response(const uint8_t * data); 
 
@@ -238,6 +252,7 @@ void gap_random_address_set(bd_addr_t addr);
  * @param advertising_data_length
  * @param advertising_data (max 31 octets)
  * @note data is not copied, pointer has to stay valid
+ * @note '00:00:00:00:00:00' in advertising_data will be replaced with actual bd addr
  */
 void gap_advertisements_set_data(uint8_t advertising_data_length, uint8_t * advertising_data);
 
@@ -269,8 +284,24 @@ void gap_advertisements_enable(int enabled);
  * @param advertising_data_length
  * @param advertising_data (max 31 octets)
  * @note data is not copied, pointer has to stay valid
+ * @note '00:00:00:00:00:00' in scan_response_data will be replaced with actual bd addr
  */
 void gap_scan_response_set_data(uint8_t scan_response_data_length, uint8_t * scan_response_data);
+
+/**
+ * @brief Set connection parameters for outgoing connections
+ * @param conn_scan_interval (unit: 0.625 msec), default: 60 ms
+ * @param conn_scan_window (unit: 0.625 msec), default: 30 ms
+ * @param conn_interval_min (unit: 1.25ms), default: 10 ms
+ * @param conn_interval_max (unit: 1.25ms), default: 30 ms
+ * @param conn_latency, default: 4
+ * @param supervision_timeout (unit: 10ms), default: 720 ms
+ * @param min_ce_length (unit: 0.625ms), default: 10 ms
+ * @param max_ce_length (unit: 0.625ms), default: 30 ms
+ */
+void gap_set_connection_parameters(uint16_t conn_scan_interval, uint16_t conn_scan_window, 
+    uint16_t conn_interval_min, uint16_t conn_interval_max, uint16_t conn_latency,
+    uint16_t supervision_timeout, uint16_t min_ce_length, uint16_t max_ce_length);
 
 /**
  * @brief Request an update of the connection parameter for a given LE connection
@@ -309,6 +340,23 @@ void gap_get_connection_parameter_range(le_connection_parameter_range_t * range)
 void gap_set_connection_parameter_range(le_connection_parameter_range_t * range);
 
 /**
+ * @brief Test if connection parameters are inside in existing rage
+ * @param conn_interval_min (unit: 1.25ms)
+ * @param conn_interval_max (unit: 1.25ms)
+ * @param conn_latency
+ * @param supervision_timeout (unit: 10ms)
+ * @returns 1 if included
+ */
+int gap_connection_parameter_range_included(le_connection_parameter_range_t * existing_range, uint16_t le_conn_interval_min, uint16_t le_conn_interval_max, uint16_t le_conn_latency, uint16_t le_supervision_timeout);
+
+/**
+ * @brief Set max number of connections in LE Peripheral role (if Bluetooth Controller supports it)
+ * @note: default: 1
+ * @param max_peripheral_connections
+ */
+void gap_set_max_number_peripheral_connections(int max_peripheral_connections);
+
+/**
  * @brief Connect to remote LE device
  */
 uint8_t gap_connect(bd_addr_t addr, bd_addr_type_t addr_type);
@@ -340,6 +388,28 @@ int gap_auto_connection_stop(bd_addr_type_t address_typ, bd_addr_t address);
  */
 void gap_auto_connection_stop_all(void);
 
+/**
+ *
+ * @brief Get encryption key size.
+ * @param con_handle
+ * @return 0 if not encrypted, 7-16 otherwise
+ */
+int gap_encryption_key_size(hci_con_handle_t con_handle);
+
+/**
+ * @brief Get authentication property.
+ * @param con_handle
+ * @return 1 if bonded with OOB/Passkey (AND MITM protection)
+ */
+int gap_authenticated(hci_con_handle_t con_handle);
+
+/**
+ * @brief Queries authorization state.
+ * @param con_handle
+ * @return authorization_state for the current session
+ */
+authorization_state_t gap_authorization_state(hci_con_handle_t con_handle);
+
 // Classic
 
 /**
@@ -365,6 +435,11 @@ void gap_local_bd_addr(bd_addr_t address_buffer);
  */
 void gap_drop_link_key_for_bd_addr(bd_addr_t addr);
 
+/**
+ * @brief Delete all stored link keys
+ */
+void gap_delete_all_link_keys(void);
+
 /** 
  * @brief Store link key for remote device with baseband address
  * @param addr
@@ -373,12 +448,120 @@ void gap_drop_link_key_for_bd_addr(bd_addr_t addr);
  */
 void gap_store_link_key_for_bd_addr(bd_addr_t addr, link_key_t link_key, link_key_type_t type);
 
+/**
+ * @brief Setup Link Key iterator
+ * @param it
+ * @returns 1 on success
+ */
+int gap_link_key_iterator_init(btstack_link_key_iterator_t * it);
+
+/**
+ * @brief Get next Link Key
+ * @param it
+ * @brief addr
+ * @brief link_key
+ * @brief type of link key
+ * @returns 1, if valid link key found
+ */
+int gap_link_key_iterator_get_next(btstack_link_key_iterator_t * it, bd_addr_t bd_addr, link_key_t link_key, link_key_type_t * type);
+
+/**
+ * @brief Frees resources allocated by iterator_init
+ * @note Must be called after iteration to free resources
+ * @param it
+ */
+void gap_link_key_iterator_done(btstack_link_key_iterator_t * it);
+
+/**
+ * @brief Start GAP Classic Inquiry
+ * @param duration in 1.28s units
+ * @return 0 if ok
+ * @events: GAP_EVENT_INQUIRY_RESULT, GAP_EVENT_INQUIRY_COMPLETE
+ */
+int gap_inquiry_start(uint8_t duration_in_1280ms_units);
+
+/**
+ * @brief Stop GAP Classic Inquiry
+ * @brief Stop GAP Classic Inquiry
+ * @returns 0 if ok
+ * @events: GAP_EVENT_INQUIRY_COMPLETE
+ */
+int gap_inquiry_stop(void);
+
+/**
+ * @brief Remote Name Request
+ * @param addr
+ * @param page_scan_repetition_mode
+ * @param clock_offset only used when bit 15 is set - pass 0 if not known
+ * @events: HCI_EVENT_REMOTE_NAME_REQUEST_COMPLETE
+ */
+int gap_remote_name_request(bd_addr_t addr, uint8_t page_scan_repetition_mode, uint16_t clock_offset);
+
+/**
+ * @brief Legacy Pairing Pin Code Response
+ * @param addr
+ * @param pin
+ * @return 0 if ok
+ */
+int gap_pin_code_response(bd_addr_t addr, const char * pin);
+
+/**
+ * @brief Abort Legacy Pairing
+ * @param addr
+ * @param pin
+ * @return 0 if ok
+ */
+int gap_pin_code_negative(bd_addr_t addr);
+
+/**
+ * @brief SSP Passkey Response
+ * @param addr
+ * @param passkey [0..999999]
+ * @return 0 if ok
+ */
+int gap_ssp_passkey_response(bd_addr_t addr, uint32_t passkey);
+
+/**
+ * @brief Abort SSP Passkey Entry/Pairing
+ * @param addr
+ * @param pin
+ * @return 0 if ok
+ */
+int gap_ssp_passkey_negative(bd_addr_t addr);
+
+/**
+ * @brief Accept SSP Numeric Comparison
+ * @param addr
+ * @param passkey
+ * @return 0 if ok
+ */
+int gap_ssp_confirmation_response(bd_addr_t addr);
+
+/**
+ * @brief Abort SSP Numeric Comparison/Pairing
+ * @param addr
+ * @param pin
+ * @return 0 if ok
+ */
+int gap_ssp_confirmation_negative(bd_addr_t addr);
+
+
+
 // LE
 
 /**
  * @brief Get own addr type and address used for LE
  */
 void gap_le_get_own_address(uint8_t * addr_type, bd_addr_t addr);
+
+
+/**
+ * @brief Get state of connection re-encryptiong for bonded devices when in central role
+ * @note used by gatt_client and att_server to wait for re-encryption
+ * @param con_handle
+ * @return 1 if security setup is active
+ */
+int gap_reconnect_security_setup_active(hci_con_handle_t con_handle);
 
 
 /* API_END*/

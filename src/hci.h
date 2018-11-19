@@ -70,10 +70,10 @@ extern "C" {
      
 // packet buffer sizes
 
-// Max HCI Commadn LE payload size:
+// Max HCI Command LE payload size:
 // 64 from LE Generate DHKey command
 // 32 from LE Encrypt command
-#if defined(ENABLE_LE_SECURE_CONNECTIONS) && !defined(HAVE_HCI_CONTROLLER_DHKEY_SUPPORT)
+#if defined(ENABLE_LE_SECURE_CONNECTIONS) && !defined(ENABLE_MICRO_ECC_FOR_LE_SECURE_CONNECTIONS)
 #define HCI_CMD_PAYLOAD_SIZE_LE 64
 #else
 #define HCI_CMD_PAYLOAD_SIZE_LE 32
@@ -91,28 +91,45 @@ extern "C" {
 
 #define HCI_ACL_BUFFER_SIZE        (HCI_ACL_HEADER_SIZE   + HCI_ACL_PAYLOAD_SIZE)
     
-// size of hci buffers, big enough for command, event, or acl packet without H4 packet type
-// @note cmd buffer is bigger than event buffer
-#ifdef HCI_PACKET_BUFFER_SIZE
-    #if HCI_PACKET_BUFFER_SIZE < HCI_ACL_BUFFER_SIZE
-        #error HCI_PACKET_BUFFER_SIZE must be equal or larger than HCI_ACL_BUFFER_SIZE
+// size of hci incoming buffer, big enough for event or acl packet without H4 packet type
+#ifdef HCI_INCOMING_PACKET_BUFFER_SIZE
+    #if HCI_INCOMING_PACKET_BUFFER_SIZE < HCI_ACL_BUFFER_SIZE
+        #error HCI_INCOMING_PACKET_BUFFER_SIZE must be equal or larger than HCI_ACL_BUFFER_SIZE
     #endif
-    #if HCI_PACKET_BUFFER_SIZE < HCI_CMD_BUFFER_SIZE
-        #error HCI_PACKET_BUFFER_SIZE must be equal or larger than HCI_CMD_BUFFER_SIZE
+    #if HCI_INCOMING_PACKET_BUFFER_SIZE < HCI_EVENT_BUFFER_SIZE
+        #error HCI_INCOMING_PACKET_BUFFER_SIZE must be equal or larger than HCI_EVENT_BUFFER_SIZE
+    #endif
+#else
+    #if HCI_ACL_BUFFER_SIZE > HCI_EVENT_BUFFER_SIZE
+        #define HCI_INCOMING_PACKET_BUFFER_SIZE HCI_ACL_BUFFER_SIZE
+    #else
+        #define HCI_INCOMING_PACKET_BUFFER_SIZE HCI_EVENT_BUFFER_SIZE
+    #endif
+#endif
+
+// size of hci outgoing buffer, big enough for command or acl packet without H4 packet type
+#ifdef HCI_OUTGOING_PACKET_BUFFER_SIZE
+    #if HCI_OUTGOING_PACKET_BUFFER_SIZE < HCI_ACL_BUFFER_SIZE
+        #error HCI_OUTGOING_PACKET_BUFFER_SIZE must be equal or larger than HCI_ACL_BUFFER_SIZE
+    #endif
+    #if HCI_OUTGOING_PACKET_BUFFER_SIZE < HCI_CMD_BUFFER_SIZE
+        #error HCI_OUTGOING_PACKET_BUFFER_SIZE must be equal or larger than HCI_CMD_BUFFER_SIZE
     #endif
 #else
     #if HCI_ACL_BUFFER_SIZE > HCI_CMD_BUFFER_SIZE
-        #define HCI_PACKET_BUFFER_SIZE HCI_ACL_BUFFER_SIZE
+        #define HCI_OUTGOING_PACKET_BUFFER_SIZE HCI_ACL_BUFFER_SIZE
     #else
-        #define HCI_PACKET_BUFFER_SIZE HCI_CMD_BUFFER_SIZE
+        #define HCI_OUTGOING_PACKET_BUFFER_SIZE HCI_CMD_BUFFER_SIZE
     #endif
 #endif
 
 // additional pre-buffer space for packets to Bluetooth module, for now, used for HCI Transport H4 DMA
+#ifndef HCI_OUTGOING_PRE_BUFFER_SIZE
 #ifdef HAVE_HOST_CONTROLLER_API
 #define HCI_OUTGOING_PRE_BUFFER_SIZE 0
 #else
 #define HCI_OUTGOING_PRE_BUFFER_SIZE 1
+#endif
 #endif
 
 // BNEP may uncompress the IP Header by 16 bytes
@@ -150,10 +167,14 @@ extern "C" {
 
 typedef enum {
     CON_PARAMETER_UPDATE_NONE,
+    // L2CAP
     CON_PARAMETER_UPDATE_SEND_REQUEST,
     CON_PARAMETER_UPDATE_SEND_RESPONSE,
     CON_PARAMETER_UPDATE_CHANGE_HCI_CON_PARAMETERS,
-    CON_PARAMETER_UPDATE_DENY
+    CON_PARAMETER_UPDATE_DENY,
+    // HCI - in respnose to HCI_SUBEVENT_LE_REMOTE_CONNECTION_PARAMETER_REQUEST
+    CON_PARAMETER_UPDATE_REPLY,
+    CON_PARAMETER_UPDATE_NEGATIVE_REPLY,
 } le_con_parameter_update_state_t;
 
 // Authentication flags
@@ -214,14 +235,6 @@ typedef enum {
     BLUETOOTH_ACTIVE
 } BLUETOOTH_STATE;
 
-// le central scanning state
-typedef enum {
-    LE_SCAN_IDLE,
-    LE_START_SCAN,
-    LE_SCANNING,
-    LE_STOP_SCAN,
-} le_scanning_state_t;
-
 typedef enum {
     LE_CONNECTING_IDLE,
     LE_CONNECTING_DIRECT,
@@ -237,7 +250,6 @@ typedef enum {
 typedef enum {
 
     // general states
-    // state = 0
     SM_GENERAL_IDLE,
     SM_GENERAL_SEND_PAIRING_FAILED,
     SM_GENERAL_TIMEOUT, // no other security messages are exchanged
@@ -258,23 +270,17 @@ typedef enum {
     SM_PH2_C1_W4_RANDOM_B,
 
     // calculate confirm value for local side
-    // state = 10
     SM_PH2_C1_GET_ENC_A,
     SM_PH2_C1_W4_ENC_A,
-    SM_PH2_C1_GET_ENC_B,
-    SM_PH2_C1_W4_ENC_B,
 
     // calculate confirm value for remote side
     SM_PH2_C1_GET_ENC_C,
     SM_PH2_C1_W4_ENC_C,
-    SM_PH2_C1_GET_ENC_D,
-    SM_PH2_C1_W4_ENC_D,
 
     SM_PH2_C1_SEND_PAIRING_CONFIRM,
     SM_PH2_SEND_PAIRING_RANDOM,
 
     // calc STK
-    // state = 20
     SM_PH2_CALC_STK,
     SM_PH2_W4_STK,
 
@@ -282,27 +288,19 @@ typedef enum {
 
     // Phase 3: Transport Specific Key Distribution
     // calculate DHK, Y, EDIV, and LTK
-    SM_PH3_GET_RANDOM,
-    SM_PH3_W4_RANDOM,
-    SM_PH3_GET_DIV,
-    SM_PH3_W4_DIV,
     SM_PH3_Y_GET_ENC,
     SM_PH3_Y_W4_ENC,
     SM_PH3_LTK_GET_ENC,
-    // state = 30
-    SM_PH3_LTK_W4_ENC,
-    SM_PH3_CSRK_GET_ENC,
-    SM_PH3_CSRK_W4_ENC,
 
     // exchange keys
     SM_PH3_DISTRIBUTE_KEYS,
     SM_PH3_RECEIVE_KEYS,
 
     // RESPONDER ROLE
-    // state = 35
     SM_RESPONDER_IDLE,
     SM_RESPONDER_SEND_SECURITY_REQUEST,
     SM_RESPONDER_PH0_RECEIVED_LTK_REQUEST,
+    SM_RESPONDER_PH0_RECEIVED_LTK_W4_IRK,
     SM_RESPONDER_PH0_SEND_LTK_REQUESTED_NEGATIVE_REPLY,
     SM_RESPONDER_PH1_W4_PAIRING_REQUEST,
     SM_RESPONDER_PH1_PAIRING_REQUEST_RECEIVED,
@@ -313,15 +311,11 @@ typedef enum {
     SM_RESPONDER_PH2_SEND_LTK_REPLY,
 
     // Phase 4: re-establish previously distributed LTK
-    // state == 46
     SM_RESPONDER_PH4_Y_GET_ENC,
     SM_RESPONDER_PH4_Y_W4_ENC,
-    SM_RESPONDER_PH4_LTK_GET_ENC,
-    SM_RESPONDER_PH4_LTK_W4_ENC,
     SM_RESPONDER_PH4_SEND_LTK_REPLY,
 
     // INITITIATOR ROLE
-    // state = 51
     SM_INITIATOR_CONNECTED,
     SM_INITIATOR_PH0_HAS_LTK,
     SM_INITIATOR_PH0_SEND_START_ENCRYPTION,
@@ -351,6 +345,7 @@ typedef enum {
     SM_SC_W4_PAIRING_RANDOM,
     SM_SC_W2_CALCULATE_G2,
     SM_SC_W4_CALCULATE_G2,
+    SM_SC_W4_CALCULATE_DHKEY,
     SM_SC_W2_CALCULATE_F5_SALT,
     SM_SC_W4_CALCULATE_F5_SALT,
     SM_SC_W2_CALCULATE_F5_MACKEY,
@@ -379,14 +374,6 @@ typedef enum {
     IRK_LOOKUP_FAILED
 } irk_lookup_state_t;
 
-// Authorization state
-typedef enum {
-    AUTHORIZATION_UNKNOWN,
-    AUTHORIZATION_PENDING,
-    AUTHORIZATION_DECLINED,
-    AUTHORIZATION_GRANTED
-} authorization_state_t;
-
 typedef uint8_t sm_pairing_packet_t[7];
 
 // connection info available as long as connection exists
@@ -394,7 +381,7 @@ typedef struct sm_connection {
     hci_con_handle_t         sm_handle;
     uint8_t                  sm_role;   // 0 - IamMaster, 1 = IamSlave
     uint8_t                  sm_security_request_received;
-    uint8_t                  sm_bonding_requested;
+    uint8_t                  sm_pairing_requested;
     uint8_t                  sm_peer_addr_type;
     bd_addr_t                sm_peer_address;
     security_manager_state_t sm_engine_state;
@@ -423,6 +410,7 @@ typedef enum {
     ATT_SERVER_REQUEST_RECEIVED,
     ATT_SERVER_W4_SIGNED_WRITE_VALIDATION,
     ATT_SERVER_REQUEST_RECEIVED_AND_VALIDATED,
+    ATT_SERVER_RESPONSE_PENDING,
 } att_server_state_t;
 
 typedef struct {
@@ -432,18 +420,36 @@ typedef struct {
     bd_addr_t               peer_address;
 
     int                     ir_le_device_db_index;
-    int                     ir_lookup_active;
+    uint8_t                 ir_lookup_active;
+    uint8_t                 pairing_active;
 
     int                     value_indication_handle;    
     btstack_timer_source_t  value_indication_timer;
 
     att_connection_t        connection;
 
+    btstack_linked_list_t   notification_requests;
+    btstack_linked_list_t   indication_requests;
+
     uint16_t                request_size;
     uint8_t                 request_buffer[ATT_REQUEST_BUFFER_SIZE];
 
 } att_server_t;
 
+#endif
+
+#ifdef ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE
+typedef enum {
+    L2CAP_INFORMATION_STATE_IDLE = 0,
+    L2CAP_INFORMATION_STATE_W2_SEND_EXTENDED_FEATURE_REQUEST,
+    L2CAP_INFORMATION_STATE_W4_EXTENDED_FEATURE_RESPONSE,
+    L2CAP_INFORMATION_STATE_DONE
+} l2cap_information_state_t;
+
+typedef struct {
+    l2cap_information_state_t information_state;
+    uint16_t                  extended_feature_mask;
+} l2cap_state_t;
 #endif
 
 //
@@ -513,6 +519,10 @@ typedef struct {
 
     // ATT Server
     att_server_t    att_server;
+#endif
+
+#ifdef ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE
+    l2cap_state_t l2cap_state;
 #endif
 
 } hci_connection_t;
@@ -598,6 +608,15 @@ typedef enum hci_init_state{
     HCI_INIT_W4_LE_READ_BUFFER_SIZE,
     HCI_INIT_WRITE_LE_HOST_SUPPORTED,
     HCI_INIT_W4_WRITE_LE_HOST_SUPPORTED,
+    HCI_INIT_LE_SET_EVENT_MASK,
+    HCI_INIT_W4_LE_SET_EVENT_MASK,
+#endif
+
+#ifdef ENABLE_LE_DATA_LENGTH_EXTENSION
+    HCI_INIT_LE_READ_MAX_DATA_LENGTH,
+    HCI_INIT_W4_LE_READ_MAX_DATA_LENGTH,
+    HCI_INIT_LE_WRITE_SUGGESTED_DATA_LENGTH,
+    HCI_INIT_W4_LE_WRITE_SUGGESTED_DATA_LENGTH,
 #endif
     
 #ifdef ENABLE_LE_CENTRAL
@@ -684,7 +703,7 @@ typedef struct {
 
     // single buffer for HCI packet assembly + additional prebuffer for H4 drivers
     uint8_t   * hci_packet_buffer;
-    uint8_t   hci_packet_buffer_data[HCI_OUTGOING_PRE_BUFFER_SIZE + HCI_PACKET_BUFFER_SIZE];
+    uint8_t   hci_packet_buffer_data[HCI_OUTGOING_PRE_BUFFER_SIZE + HCI_OUTGOING_PACKET_BUFFER_SIZE];
     uint8_t   hci_packet_buffer_reserved;
     uint16_t  acl_fragmentation_pos;
     uint16_t  acl_fragmentation_total_size;
@@ -704,10 +723,12 @@ typedef struct {
     uint8_t local_supported_features[8];
 
     /* local supported commands summary - complete info is 64 bytes */
-    /* 0 - read buffer size */
-    /* 1 - write le host supported */
+    /* 0 - Read Buffer Size */
+    /* 1 - Write Le Host Supported */
     /* 2 - Write Synchronous Flow Control Enable (Octet 10/bit 4) */
-    /* 3 - Write Default Erroneous Data Reporting (Octect 18/bit 3) */
+    /* 3 - Write Default Erroneous Data Reporting (Octet 18/bit 3) */
+    /* 4 - LE Write Suggested Default Data Length (Octet 34/bit 0) */
+    /* 5 - LE Read Maximum Data Length (Octet 35/bit 3) */
     uint8_t local_supported_commands[1];
 
     /* bluetooth device information from hci read local version information */
@@ -725,16 +746,31 @@ typedef struct {
     HCI_STATE      state;
     hci_substate_t substate;
     btstack_timer_source_t timeout;
-    uint8_t   cmds_ready;
-    
+
     uint16_t  last_cmd_opcode;
+
+    uint8_t   cmds_ready;
+
+    /* buffer for scan enable cmd - 0xff no change */
+    uint8_t   new_scan_enable_value;
 
     uint8_t   discoverable;
     uint8_t   connectable;
     uint8_t   bondable;
 
-    /* buffer for scan enable cmd - 0xff no change */
-    uint8_t   new_scan_enable_value;
+    uint8_t   inquiry_state;    // see hci.c for state defines
+
+    bd_addr_t remote_name_addr;
+    uint16_t  remote_name_clock_offset;
+    uint8_t   remote_name_page_scan_repetition_mode;
+    uint8_t   remote_name_state;    // see hci.c for state defines
+
+    bd_addr_t gap_pairing_addr;
+    uint8_t   gap_pairing_state;    // see hci.c for state defines
+    union {
+        const char * gap_pairing_pin;
+        uint32_t     gap_pairing_passkey;
+    } gap_pairing_input;
     
     uint16_t  sco_voice_setting;
     uint16_t  sco_voice_setting_active;
@@ -756,7 +792,9 @@ typedef struct {
 #endif
 
 #ifdef ENABLE_LE_CENTRAL
-    le_scanning_state_t   le_scanning_state;
+    uint8_t   le_scanning_enabled;
+    uint8_t   le_scanning_active;
+
     le_connecting_state_t le_connecting_state;
 
     // buffer for le scan type command - 0xff not set
@@ -767,6 +805,16 @@ typedef struct {
     // LE Whitelist Management
     uint8_t               le_whitelist_capacity;
     btstack_linked_list_t le_whitelist;
+
+    // Connection parameters
+    uint16_t le_connection_interval_min;
+    uint16_t le_connection_interval_max;
+    uint16_t le_connection_latency;
+    uint16_t le_supervision_timeout;
+    uint16_t le_minimum_ce_length;
+    uint16_t le_maximum_ce_length;
+    uint16_t le_connection_scan_interval;
+    uint16_t le_connection_scan_window;
 #endif
 
     le_connection_parameter_range_t le_connection_parameter_range;
@@ -789,11 +837,27 @@ typedef struct {
     uint8_t  le_advertisements_channel_map;
     uint8_t  le_advertisements_filter_policy;
     bd_addr_t le_advertisements_direct_address;
+
+    uint8_t le_max_number_peripheral_connections;
+#endif
+
+#ifdef ENABLE_LE_DATA_LENGTH_EXTENSION
+    // LE Data Length
+    uint16_t le_supported_max_tx_octets;
+    uint16_t le_supported_max_tx_time;
 #endif
 
     // custom BD ADDR
     bd_addr_t custom_bd_addr; 
     uint8_t   custom_bd_addr_set;
+
+#ifdef ENABLE_CLASSIC
+    uint8_t master_slave_policy;
+#endif
+
+    // address and address_type of active create connection command (ACL, SCO, LE)
+    bd_addr_t      outgoing_addr;
+    bd_addr_type_t outgoing_addr_type;
 
 } hci_stack_t;
 
@@ -945,12 +1009,17 @@ uint8_t* hci_get_outgoing_packet_buffer(void);
  */
 void hci_release_packet_buffer(void);
 
+/**
+* @brief Sets the master/slave policy
+* @param policy (0: attempt to become master, 1: let connecting device decide)
+*/
+void hci_set_master_slave_policy(uint8_t policy);
 
 /* API_END */
 
 
 /**
- * va_list version of hci_send_cmd
+ * va_list version of hci_send_cmd, call hci_send_cmd_packet
  */
 int hci_send_cmd_va_arg(const hci_cmd_t *cmd, va_list argtr);
 
@@ -1046,7 +1115,8 @@ int hci_remote_esco_supported(hci_con_handle_t con_handle);
 void hci_emit_state(void);
 
 /** 
- * Send complete CMD packet. Called by daemon
+ * Send complete CMD packet. Called by daemon and hci_send_cmd_va_arg
+ * @returns 0 if command was successfully sent to HCI Transport layer
  */
 int hci_send_cmd_packet(uint8_t *packet, int size);
 
@@ -1093,6 +1163,11 @@ uint16_t hci_get_manufacturer(void);
  * Disable automatic L2CAP disconnect if no L2CAP connection is established
  */
 void hci_disable_l2cap_timeout_check(void);
+
+/**
+ * Get state
+ */
+HCI_STATE hci_get_state(void);
 
 #if defined __cplusplus
 }

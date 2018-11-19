@@ -43,6 +43,9 @@
  * @text The Serial port profile (SPP) is widely used as it provides a serial
  * port over Bluetooth. The SPP counter example demonstrates how to setup an SPP
  * service, and provide a periodic timer over RFCOMM.   
+ *
+ * @text Note: To test, please run the spp_counter example, and then pair from 
+ * a remote device, and open the Virtual Serial Port.
  */
 // *****************************************************************************
 
@@ -185,10 +188,10 @@ static void packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *pack
             switch (hci_event_packet_get_type(packet)) {
 /* LISTING_RESUME */ 
                 case HCI_EVENT_PIN_CODE_REQUEST:
-                    // pre-ssp: inform about pin code request
+                    // inform about pin code request
                     printf("Pin code request - using '0000'\n");
                     hci_event_pin_code_request_get_bd_addr(packet, event_addr);
-                    hci_send_cmd(&hci_pin_code_request_reply, &event_addr, 4, "0000");
+                    gap_pin_code_response(event_addr, "0000");
                     break;
 
                 case HCI_EVENT_USER_CONFIRMATION_REQUEST:
@@ -256,7 +259,7 @@ int btstack_main(int argc, const char * argv[]){
 
     gap_discoverable_control(1);
     gap_ssp_set_io_capability(SSP_IO_CAPABILITY_DISPLAY_YES_NO);
-    gap_set_local_name("BTstack SPP Counter");
+    gap_set_local_name("SPP Counter 00:00:00:00:00:00");
 
     // turn on!
     hci_power_control(HCI_POWER_ON);

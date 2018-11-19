@@ -62,7 +62,7 @@
 #include "hci.h"
 #include "hci_dump.h"
 #include "l2cap.h"
-#include "stdin_support.h"
+#include "btstack_stdin.h"
 
 // test profile
 #include "ble_central_test.h"
@@ -253,6 +253,7 @@ const char * ad_event_types[] = {
 };
 
 static void handle_advertising_event(uint8_t * packet, int size){
+    UNUSED(size);
     // filter PTS
     bd_addr_t addr;
     gap_event_advertising_report_get_address(packet, addr);
@@ -320,6 +321,7 @@ static void gap_run(void){
 }
 
 static void app_packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
+    UNUSED(channel);
     uint16_t aHandle;
     bd_addr_t event_address;
 
@@ -430,7 +432,8 @@ static void extract_characteristic(gatt_client_characteristic_t * characteristic
 }
 
 static void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
-
+    UNUSED(channel);
+    UNUSED(size);
     if (packet_type != HCI_EVENT_PACKET) return;
 
     uint8_t address_type;
@@ -674,7 +677,7 @@ static void handle_gatt_client_event(uint8_t packet_type, uint16_t channel, uint
                     break;
                 case CENTRAL_W4_RECONNECTION_ADDRESS_QUERY_COMPLETE:
                     central_state = CENTRAL_IDLE;
-                    gap_advertisements_get_address(&address_type, our_private_address);
+                    gap_le_get_own_address(&address_type, our_private_address);
                     printf("Our private address: %s\n", bd_addr_to_str(our_private_address));
                     reverse_bd_addr(our_private_address, flipped_address);
                     gatt_client_write_value_of_characteristic(handle_gatt_client_event, handle, gap_reconnection_address_characteristic.value_handle, 6, flipped_address);
@@ -863,7 +866,7 @@ static void print_screen(void){
 static void show_usage(void){
     uint8_t iut_address_type;
     bd_addr_t      iut_address;
-    gap_advertisements_get_address(&iut_address_type, iut_address);
+    gap_le_get_own_address(&iut_address_type, iut_address);
 
     reset_screen();
 
@@ -1597,36 +1600,35 @@ static void ui_process_command(char buffer){
     }
 }
 
-static void stdin_process(btstack_data_source_t *ds, btstack_data_source_callback_type_t callback_type){
-    char buffer;
-    read(ds->fd, &buffer, 1);
-
+static void stdin_process(char c){
     if (ui_digits_for_passkey){
-        ui_process_digits_for_passkey(buffer);
+        ui_process_digits_for_passkey(c);
         return;
     }
 
     if (ui_uint16_request){
-        ui_process_uint16_request(buffer);
+        ui_process_uint16_request(c);
         return;
     }
 
     if (ui_uuid128_request){
-        ui_process_uuid128_request(buffer);
+        ui_process_uuid128_request(c);
         return;
     }
 
     if (ui_value_request){
-        ui_process_data_request(buffer);        
+        ui_process_data_request(c);        
         return;
     }
 
-    ui_process_command(buffer);
+    ui_process_command(c);
 
     return;
 }
 
 static int get_oob_data_callback(uint8_t addres_type, bd_addr_t addr, uint8_t * oob_data){
+    UNUSED(addres_type);
+    (void)addr;
     switch(sm_have_oob_data){
         case 1:
             memcpy(oob_data, sm_oob_data_A, 16);
@@ -1644,7 +1646,8 @@ static int get_oob_data_callback(uint8_t addres_type, bd_addr_t addr, uint8_t * 
 // - if buffer != NULL, copy data and return number bytes copied
 // @param offset defines start of attribute value
 static uint16_t att_read_callback(hci_con_handle_t con_handle, uint16_t attribute_handle, uint16_t offset, uint8_t * buffer, uint16_t buffer_size){
-
+    UNUSED(con_handle);
+    UNUSED(attribute_handle);
     printf("READ Callback, handle %04x, offset %u, buffer size %u\n", handle, offset, buffer_size);
     uint16_t  att_value_len;
 
@@ -1664,7 +1667,8 @@ static uint16_t att_read_callback(hci_con_handle_t con_handle, uint16_t attribut
 
 int btstack_main(int argc, const char * argv[]);
 int btstack_main(int argc, const char * argv[]){
-    
+    UNUSED(argc);
+    (void)argv;
     printf("BTstack LE Peripheral starting up...\n");
 
     memset(rows, 0, sizeof(char *) * 100);

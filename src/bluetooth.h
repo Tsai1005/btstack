@@ -108,6 +108,49 @@ typedef enum {
   INQUIRY_MODE_RSSI_AND_EIR,
 } inquiry_mode_t;
 
+
+/*
+ * @brief L2CAP Segmentation And Reassembly packet type in I-Frames
+ */
+typedef enum {
+    L2CAP_SEGMENTATION_AND_REASSEMBLY_UNSEGMENTED_L2CAP_SDU = 0,
+    L2CAP_SEGMENTATION_AND_REASSEMBLY_START_OF_L2CAP_SDU,
+    L2CAP_SEGMENTATION_AND_REASSEMBLY_END_OF_L2CAP_SDU,
+    L2CAP_SEGMENTATION_AND_REASSEMBLY_CONTINUATION_OF_L2CAP_SDU
+} l2cap_segmentation_and_reassembly_t;
+
+/*
+ * @brief L2CAP Supervisory function in S-Frames
+ */
+typedef enum {
+    L2CAP_SUPERVISORY_FUNCTION_RR_RECEIVER_READY = 0,
+    L2CAP_SUPERVISORY_FUNCTION_REJ_REJECT,
+    L2CAP_SUPERVISORY_FUNCTION_RNR_RECEIVER_NOT_READY,
+    L2CAP_SUPERVISORY_FUNCTION_SREJ_SELECTIVE_REJECT
+} l2cap_supervisory_function_t;
+
+/**
+ * @brief L2CAP Information Types used in Information Request & Response
+ */
+typedef enum {
+  L2CAP_INFO_TYPE_CONNECTIONLESS_MTU = 1,
+  L2CAP_INFO_TYPE_EXTENDED_FEATURES_SUPPORTED,
+  L2CAP_INFO_TYPE_FIXED_CHANNELS_SUPPORTED,
+} l2cap_info_type_t;
+
+/**
+ * @brief L2CAP Configuration Option Types used in Configurateion Request & Response
+ */
+typedef enum {
+  L2CAP_CONFIG_OPTION_TYPE_MAX_TRANSMISSION_UNIT = 1,
+  L2CAP_CONFIG_OPTION_TYPE_FLUSH_TIMEOUT,
+  L2CAP_CONFIG_OPTION_TYPE_QUALITY_OF_SERVICE,
+  L2CAP_CONFIG_OPTION_TYPE_RETRANSMISSION_AND_FLOW_CONTROL, 
+  L2CAP_CONFIG_OPTION_TYPE_FRAME_CHECK_SEQUENCE,
+  L2CAP_CONFIG_OPTION_TYPE_EXTENDED_FLOW_SPECIFICATION,
+  L2CAP_CONFIG_OPTION_TYPE_EXTENDED_WINDOW_SIZE,
+} l2cap_config_option_type_t;
+
 /**
  * HCI Transport 
  */
@@ -131,10 +174,10 @@ typedef enum {
  */
 
 //
-// Error Codes
+// Error Codes rfom Bluetooth Core Specification
 //
 
-// from Bluetooth Core Specification
+/* ENUM_START: BLUETOOTH_ERROR_CODE */
 #define ERROR_CODE_SUCCESS                                 0x00 
 #define ERROR_CODE_UNKNOWN_HCI_COMMAND                     0x01
 #define ERROR_CODE_UNKNOWN_CONNECTION_IDENTIFIER           0x02
@@ -200,6 +243,34 @@ typedef enum {
 #define ERROR_CODE_CONNECTION_FAILED_TO_BE_ESTABLISHED     0x3E
 #define ERROR_CODE_MAC_CONNECTION_FAILED                   0x3F
 #define ERROR_CODE_COARSE_CLOCK_ADJUSTMENT_REJECTED_BUT_WILL_TRY_TO_ADJUST_USING_CLOCK_DRAGGING 0x40
+/* ENUM_END */
+
+/* ENUM_START: AVRCP_BROWSING_ERROR_CODE */
+#define AVRCP_BROWSING_ERROR_CODE_INVALID_COMMAND                     0x00  // Sent if TG received a PDU that it did not understand. Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_INVALID_PARAMETER                   0x01  // Sent if the TG received a PDU with a parameter ID that it did not understand. Sent if there is only one parameter ID in the PDU. Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_SPECIFIED_PARAMETER_NOT_FOUND       0x02  // Sent if the parameter ID is understood, but content is wrong or corrupted. Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_INTERNAL_ERROR                      0x03  // Sent if there are error conditions not covered by a more specific error code. Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_SUCCESS                             0x04  // This is the status that should be returned if the operation was successful. Valid for All except where the response CType is AV/C REJECTED.
+#define AVRCP_BROWSING_ERROR_CODE_UID_CHANGED                         0x05  // The UIDs on the device have changed. Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_RESERVED_06                         0x06  // Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_INVALID_DIRECTION                   0x07  // The Direction parameter is invalid. Valid for Change Path.
+#define AVRCP_BROWSING_ERROR_CODE_NOT_A_DIRECTORY                     0x08  // The UID provided does not refer to a folder item. Valid for Change Path.
+#define AVRCP_BROWSING_ERROR_CODE_DOES_NOT_EXIST                      0x09  // The UID provided does not refer to any currently valid. Valid for Change Path, PlayItem, AddToNowPlaying, GetItemAttributes.
+#define AVRCP_BROWSING_ERROR_CODE_INVALID_SCOPE                       0x0a  // The scope parameter is invalid. Valid for GetFolderItems, PlayItem, AddToNowPlayer, GetItemAttributes,.
+#define AVRCP_BROWSING_ERROR_CODE_RANGE_OUT_OF_BOUNDS                 0x0b  // The start of range provided is not valid. Valid for GetFolderItems.
+#define AVRCP_BROWSING_ERROR_CODE_UID_IS_A_DIRECTORY                  0x0c  // The UID provided refers to a directory, which cannot be handled by this media player. Valid for PlayItem, AddToNowPlaying.
+#define AVRCP_BROWSING_ERROR_CODE_MEDIA_IN_USES                       0x0d  // The media is not able to be used for this operation at this time. Valid for PlayItem, AddToNowPlaying.
+#define AVRCP_BROWSING_ERROR_CODE_NOW_PLAYING_LIST_FULL               0x0e  // No more items can be added to the Now Playing List. Valid for AddToNowPlaying.
+#define AVRCP_BROWSING_ERROR_CODE_SEARCH_NOT_SUPPORTED                0x0f  // The Browsed Media Player does not support search. Valid for Search.
+#define AVRCP_BROWSING_ERROR_CODE_SEARCH_IN_PROGRESS                  0x10  // A search operation is already in progress. Valid for Search.
+#define AVRCP_BROWSING_ERROR_CODE_INVALID_PLAYER_ID                   0x11  // The specified Player Id does not refer to a valid player. Valid for SetAddressedPlayer, SetBrowsedPlayer.
+#define AVRCP_BROWSING_ERROR_CODE_PLAYER_NOT_BROWSABLE                0x12  // The Player Id supplied refers to a Media Player which does not support browsing. Valid for SetBrowsedPlayer.
+#define AVRCP_BROWSING_ERROR_CODE_PLAYER_NOT_ADDRESSED                0x13  // The Player Id supplied refers to a player which is not currently addressed, and the command is not able to be performed if the player is not set as addressed. Valid for Search SetBrowsedPlayer.
+#define AVRCP_BROWSING_ERROR_CODE_NO_VALID_SEARCH_RESULTS             0x14  // The Search result list does not contain valid entries, e.g. after being invalidated due to change of browsed player. Valid for GetFolderItems.
+#define AVRCP_BROWSING_ERROR_CODE_NO_AVAILABLE_PLAYERS                0x15  // Valid for All.
+#define AVRCP_BROWSING_ERROR_CODE_ADDRESSED_PLAYER_CHANGED            0x16  // Valid for Register Notification.
+// 0x17-0xff Reserved
+/* ENUM_END */
 
 // HCI roles
 #define HCI_ROLE_MASTER 0
@@ -227,7 +298,8 @@ typedef enum {
 /**
  * Default INQ Mode
  */
-#define HCI_INQUIRY_LAP 0x9E8B33L  // 0x9E8B33: General/Unlimited Inquiry Access Code (GIAC)
+#define GAP_IAC_GENERAL_INQUIRY 0x9E8B33L // General/Unlimited Inquiry Access Code (GIAC)
+#define GAP_IAC_LIMITED_INQUIRY 0x9E8B00L // Limited Dedicated Inquiry Access Code (LIAC)
 
 /**
  * SSP IO Capabilities
@@ -607,11 +679,10 @@ typedef enum {
  */
 #define HCI_SUBEVENT_LE_READ_LOCAL_P256_PUBLIC_KEY_COMPLETE 0x08
  /**
- * @format 11QQ
+ * @format 11Q
  * @param subevent_code
  * @param status
- * @param dhkey_x x coordinate of Diffie-Hellman key
- * @param dhkey_y y coordinate of Diffie-Hellman key
+ * @param dhkey Diffie-Hellman key
  */
 #define HCI_SUBEVENT_LE_GENERATE_DHKEY_COMPLETE            0x09
 
@@ -661,7 +732,12 @@ typedef enum {
 #define L2CAP_CID_SECURITY_MANAGER_PROTOCOL 0x0006
 
 // L2CAP Configuration Result Codes
-#define L2CAP_CONF_RESULT_UNKNOWN_OPTIONS   0x0003
+#define L2CAP_CONF_RESULT_SUCCESS                  0x0000
+#define L2CAP_CONF_RESULT_UNACCEPTABLE_PARAMETERS  0x0001
+#define L2CAP_CONF_RESULT_REJECT                   0x0002
+#define L2CAP_CONF_RESULT_UNKNOWN_OPTIONS          0x0003
+#define L2CAP_CONF_RESULT_PENDING                  0x0004
+#define L2CAP_CONF_RESULT_FLOW_SPEC_REJECTED       0x0005
 
 // L2CAP Reject Result Codes
 #define L2CAP_REJ_CMD_UNKNOWN               0x0000
@@ -672,12 +748,17 @@ typedef enum {
 // Extended Response Timeout eXpired
 #define L2CAP_ERTX_TIMEOUT_MS 120000
 
-// Fixed PSM numbers
+//
+// Fixed PSM numbers from https://www.bluetooth.com/specifications/assigned-numbers/logical-link-control 
+//
+// @TODO: replace with BLUETOOTH_PROTOCOL_xxx in rest of code
 #define PSM_SDP           BLUETOOTH_PROTOCOL_SDP
 #define PSM_RFCOMM        BLUETOOTH_PROTOCOL_RFCOMM
 #define PSM_BNEP          BLUETOOTH_PROTOCOL_BNEP
+// @TODO: scrape PSMs Bluetooth SIG site and put in bluetooth_psm.h or bluetooth_l2cap.h
 #define PSM_HID_CONTROL   0x11
 #define PSM_HID_INTERRUPT 0x13
+#define PSM_IPSP          0x23
 
 /**
  * SDP Protocol
@@ -1020,21 +1101,31 @@ typedef enum {
 // MARK: Attribute Property Flag, BTstack extension
 // value is asked from client
 #define ATT_PROPERTY_DYNAMIC             0x100
+
+// Security levels
+#define ATT_SECURITY_NONE 0
+#define ATT_SECURITY_ENCRYPTED 1
+#define ATT_SECURITY_AUTHENTICATED 2
+#define ATT_SECURITY_AUTHORIZED 3
+
+// internal additions
 // 128 bit UUID used
 #define ATT_PROPERTY_UUID128             0x200
-// Authentication required
-#define ATT_PROPERTY_AUTHENTICATION_REQUIRED 0x400
-// Authorization from user required
-#define ATT_PROPERTY_AUTHORIZATION_REQUIRED  0x800
-// Encryption key size stored in upper 4 bits, 0 == no encryption, encryption key size - 1 otherwise
+// Read/Write Permission bits
+#define ATT_PROPERTY_READ_PERMISSION_BIT_0  0x0400
+#define ATT_PROPERTY_READ_PERMISSION_BIT_1  0x0800
+#define ATT_PROPERTY_WRITE_PERMISSION_BIT_0 0x0001
+#define ATT_PROPERTY_WRITE_PERMISSION_BIT_1 0x0010
 
-// ATT Transaction Timeout of 30 seconds for Command/Response or Incidationc/Confirmation
+
+// ATT Transaction Timeout of 30 seconds for Command/Response or Indication/Confirmation
 #define ATT_TRANSACTION_TIMEOUT_MS     30000
 
 #define ATT_TRANSACTION_MODE_NONE      0x0
 #define ATT_TRANSACTION_MODE_ACTIVE    0x1
 #define ATT_TRANSACTION_MODE_EXECUTE   0x2
 #define ATT_TRANSACTION_MODE_CANCEL    0x3
+#define ATT_TRANSACTION_MODE_VALIDATE  0x4
 
 // MARK: GATT UUIDs
 #define GATT_PRIMARY_SERVICE_UUID                   0x2800
@@ -1119,7 +1210,7 @@ typedef enum {
 
 // Pairing Failed Reasons
 #define SM_REASON_RESERVED                     0x00
-#define SM_REASON_PASSKEYT_ENTRY_FAILED        0x01
+#define SM_REASON_PASSKEY_ENTRY_FAILED         0x01
 #define SM_REASON_OOB_NOT_AVAILABLE            0x02
 #define SM_REASON_AUTHENTHICATION_REQUIREMENTS 0x03
 #define SM_REASON_CONFIRM_VALUE_FAILED         0x04

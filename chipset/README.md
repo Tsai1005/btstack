@@ -25,6 +25,9 @@ The predecessor of H5. The main difference to H5 is that Even Parity is used for
 ### eHCILL
 Finally, Texas Instruments extended H4 to create the "eHCILL transport" layer that allows both sides to enter sleep mode without loosing synchronisation. While it is easier to implement than H5, it it is only supported by TI chipsets and cannot handle packet loss or bit-errors.
 
+### H4 over SPI
+Chipsets from Dialog Semiconductor and EM Marin allow to send H4 formatted HCI packets via SPI. SPI has the benefit of a simpler implementation for both Host Controller and Host as it does not require an exact clock. The SPI Master, here the Host, provides the SPI Clock and the SPI Slave (Host Controller) only has to read and update it's data lines when the clock line changes. The EM9304 supports an SPI clock of up to 8 Mhz. However, an additional protocol is needed to let the Host know when the Host Controller has HCI packet for it. Often, an additional GPIO is used to signal this.
+
 ### HCI Shortcomings
 
 Unfortunately, the HCI standard misses a few relevant details:
@@ -50,29 +53,47 @@ CSR, which has been acquired by Qualcomm, provides all relevant information on t
 
 Chipset              | Type      | HCI Transport  | BD_ADDR (1)  | SCO over HCI (2) | LE DLE | Multiple LE Roles    | BTstack folder | Comment
 -------------------- |-----------| ---------------|--------------|------------------|--------|----------------------|----------------|---------
+Atmel ATWILC3000     | LE        | H4             | Yes          | Don't know       | No     |         No           | atwilc3000     | BLE Firmware size: 60 kB
 Broadcom UART        | Dual mode | H4, H5         | Rarely       | Probably (2)     | No     |      Maybe (3)       | bcm            | Max UART baudrate 2 mbps
 Broadcom USB Dongles | Dual mode | USB            | Yes          | Yes              | No     |         No           | bcm            |
 CSR UART             | Dual mode | H4, H5, BCSP   | Rarely       | No (didn't work) | No     |         No           | csr            |
 CSR USB Dongles      | Dual mode | USB            | Mostly       | Yes              | No     |         No           | csr            |
+Cypress CYW20704     | Dual mode | H4, H5, USB    | Don't know   | Probably (2)     | Yes    |        Yes           | bcm            |
 Dialog DA14581       | LE        | H4, SPI        | No           | n.a.             | No     |         No           | da14581        | Official HCI firmware included in BTstack
-EM 9301              | LE        | SPI            | No           | n.a.             | No     |         No           | em9301         | Custom HCI SPI implementation
-EM 9304              | LE        | SPI, H4        | ?            | n.a.             | Yes    |         No           |                | Waiting for dev kit
-Nordic nRF           | LE        | H4             | Fixed Random | n.a.             | Yes    |         Yes          |                | Requires custom HCI firmware
+Dialog DA14585       | LE        | H4, SPI        | No           | n.a.             | Yes     |       Yes           | da14581        | Official HCI firmware included in BTstack
+Espressif ESP32      | Dual mode | VHCI           | Yes          | Not yet          | Yes    |        Yes           |                | SoC with Bluetooth and Wifi
+EM 9301              | LE        | SPI, H4        | No           | n.a.             | No     |         No           | em9301         | Custom HCI SPI implementation
+EM 9304              | LE        | SPI, H4        | Yes          | n.a.             | Yes    |        Yes           | em9301         | Custom HCI SPI implementation
+Intel Dual Wireless 8260, 8265 | Dual mode | USB  | Yes          | Probably         | Don't know | Don't know       | intel          | Firmware size: 400 kB 
+Nordic nRF           | LE        | H4             | Fixed Random | n.a.             | Yes    |        Yes           |                | Requires HCI firmware
 STM STLC2500D        | Classic   | H4             | No           | No (didn't try)  | n.a    |         n.a.         | stlc2500d      | Custom deep sleep management not supported
-Toshiba TC35661      | Dual mode | H4             | No           | No (didn't try)  | No     |         No           | tc3566         | HCI version not tested. See below
+Toshiba TC35661      | Dual mode | H4             | No           | No               | No     |         No           | tc3566         | Only -007/009 models provide full HCI. See below
 TI CC256x, WL183x    | Dual mode | H4, H5, eHCILL | Yes          | Yes              | No     |    Yes for CC256XC   | cc256x         | Also WL185x, WL187x, and WL189x
 
 **Notes**:
 
-  1. BD_ADDR: Indciates if Bluetooth chipset compes with its own valid MAC Addess. Better Broadcom and CSR dongles usually come with a MAC address from the dongle manufacturer, but cheaper ones might come with identical addresses.
+  1. BD_ADDR: Indiates if Bluetooth chipset compes with its own valid MAC Addess. Better Broadcom and CSR dongles usually come with a MAC address from the dongle manufacturer, but cheaper ones might come with identical addresses.
   2. SCO over HCI: All Bluetooth Classic chipsets support SCO over HCI, for those that are marked with No, we either didn't try or didn't found enough information to configure it correctly.
   3. Multiple LE Roles: Apple uses Broadcom Bluetooth+Wifi in their iOS devices and newer iOS versions support multiple concurrent LE roles,
   so at least some Broadcom models support multiple concurrent LE roles.
 
-## Broadcom
+## Atmel/Microchip
+
+The ATILC3000 Bluetooth/Wifi combo controller has been used with Linux on embedded devices by Atmel/Microchip. Drivers and documentation are available from a [GitHub repository](https://github.com/atwilc3000). The ATWILC3000 has a basic HCI implementation stored in ROM and requires a firmware image to be uploaded before it can be used. The BLE Controller is qualified as [QDID 99659](https://www.bluetooth.org/tpg/QLI_viewQDL.cfm?qid=36402). Please note: the BLE firmware is around 60 kB. It might need a separate Wifi firmware as well.
+
+**BD Addr** can be set with vendor-specific command although all chipsets have an official address stored. The BD_ADDR lookup results in "Newport Media Inc." which was [acquired by Atmel](http://www.atmel.com/about/news/release.aspx?reference=tcm:26-62532) in 2014.
+
+**Baud rate** can be set with a custom command.
+
+**BTstack integration**: *btstack_chipset_atwilc3000.c* contains the code to download the Bluetooth firmware image into the RAM of the ATWILC3000. After that, it can be normally used by BTstack.
+
+## Broadcom/Cypress Semiconductor
 
 Before the Broadcom Wifi+Bluetooth division was taken over by Cypress Semiconductor, it was not possible to buy Broadcom chipset in low quantities. Nevertheless, module manufacturers like Ampak created modules that contained Broadcom BCM chipsets (Bluetooth as well as Bluetooth+Wifi combos) that might already have been pre-tested for FCC and similar certifications.
+
 A popular example is the Ampak AP6212A module that contains an BCM 43438A1 and is used on the Raspberry Pi 3, the RedBear Duo, and the RedBear IoT pHAT for older Raspberry Pi models.
+
+The CYW20704 A2 controller supports both DLE as well as multiple LE roles and is available e.g. from [LairdTech](https://www.lairdtech.com/bt850-bt851-and-bt860-series-modules-adapter-dvks-0002) as UART module (BT860), USB module (BT850), and USB dongle.
 
 The best source for documentation on vendor specific commands so far has been the source code for blueZ and the Bluedroid Bluetooth stack from Android.
 
@@ -92,11 +113,13 @@ BTstack supports uploading of the init script in two variants: using .hcd files 
 
 **BTstack integration**: The common code for all Broadcom chipsets is provided by *btstack_chipset_bcm.c*. During the setup, *btstack_chipset_bcm_instance* function is used to get a *btstack_chipset_t* instance and passed to *hci_init* function.
 
-SCO Data can be routed over HCI for both USB dongles and UART connections, however BTstack does not provide any form of flow control for UART connections. HSP and HFP Narrow Band Speech is supported via I2C/PCM pins.
+SCO Data can be routed over HCI for both USB dongles and UART connections, however BTstack does not support flow control for UART connections. HSP and HFP Narrow Band Speech is supported via I2C/PCM pins.
 
-## CSR
+## CSR / Qualcomm Incorporated
 
-Similar to Broadcom, the best source for documentation is the source code for blueZ.
+CSR plc has been acquired by Qualcomm Incorporated in August 2015.
+
+Similar to Broadcom, the best source for documentation is the source code for blueZ. 
 
 CSR USB dongles do not require special configuration and SCO data is routed over USB by default.
 
@@ -117,7 +140,9 @@ SCO Data is routed over HCI for USB dongles, but not for UART connections. HSP a
 
 Dialog Semiconductor offers the DA14581, an LE-only SoC that can be programmed with an HCI firmware. The HCI firmware can be uploaded on boot into SRAM or stored in the OTP (One-time programmable) memory, or in an external SPI.
 
-IT does not implement the Data Length Extension or supports multiple concurrent roles.
+It does not implement the Data Length Extension or supports multiple concurrent roles.
+
+The newer DA14585 uses the same firmware upload mechanism as the 581 model. In addition, it supports both Data Length Extension as well as multiple concurrent roles.
 
 **BD Addr** fixed to 80:EA:CA:00:00:01. No command in HCI firmware to set it differently. Random addresses could be used instead.
 
@@ -125,30 +150,41 @@ IT does not implement the Data Length Extension or supports multiple concurrent 
 
 **BTstack integration**: *btstack_chipset_da14581.c* contains the code to download the provided HCI firmware into the SRAM of the DA14581. After that, it can be used as any other HCI chipset.
 
+## Espressif ESP32
+
+The ESP32 is a SoC with a built-in Dual mode Bluetooth and Wifi radio. The HCI Controller is implemented in software and accessed via a so called Virtual HCI (VHCI) interface. It supports both LE Data Length Extensions (DLE) as well as multiple LE roles. SCO isn't supported currently, but [Espressif is working on it](https://github.com/espressif/esp-idf/issues/1118).
+
+Bluetooth/Wifi Co-existance didn't work until recently and [seems to have been fixed](https://github.com/espressif/esp-idf/issues/1291)
+
 ## EM Microelectronic Marin
 
 For a long time, the EM9301 has been the only Bluetooth Single-Mode LE chipset with an HCI interface. The EM9301 can be connected via SPI or UART. The UART interface does not support hardware flow control and is not recommended for use with BTstack. The SPI mode uses a proprietary but documented extension to implement flow control and signal if the EM9301 has data to send.
 
-**Update:** EM has just announced a new EM9304 that also features an HCI mode and supports the Bluetooth 4.2. specification. It seems to support the Data Length Extension but not and multiple concurrent roles.
+In December 2016, EM released the new EM9304 that also features an HCI mode and adds support for optional Bluetooth 4.2. features. It supports the Data Length Extension and up to 8 LE roles. The EM9304 is a larger MCU that allows to run custom code on it. For this, an advanced mechanism to upload configuration and firmware to RAM or into an One-Time-Programmable area of 128 kB is supported. It supports a superset of the vendor specific commands of the EM9301.
 
-**BD Addr** must be set during startup since it does not have a stored fix address.
+EM9304 is used by the 'stm32-l053r8-em9304' port in BTstack. The port.c file also contains an IRQ+DMA-driven implementation of the SPI H4 protocol specified in the [datasheet](http://www.emmicroelectronic.com/sites/default/files/public/products/datasheets/9304-ds_0.pdf).
+
+**BD Addr** must be set during startup for EM9301 since it does not have a stored fix address. The EM9304 comes with an valid address stored in OTP.
 
 **SCO data** is not supported since it is LE only.
 
-**Baud rate** could be set for UART mode. For SPI, the master controls the speed via the SPI Clock line.
+**Baud rate** can be set for UART mode. For SPI, the master controls the speed via the SPI Clock line. With 3.3V, 16 Mhz is supported.
 
-**Init scripts** are not required although it is possible to upload small firmware patches.
+**Init scripts** are not required although it is possible to upload small firmware patches to RAM or the OTP memory (EM9304 only).
 
-**BTstack integration**: The common code for the EM9301 is provided by *btstack_chipset_em9301.c*. During the setup, *btstack_chipset_em9301_instance* function is used to get a *btstack_chipset_t* instance and passed to *hci_init* function. It enables to set the BD Addr during start.
+**BTstack integration**: The common code for the EM9304 is provided by *btstack_chipset_em9301.c*. During the setup, *btstack_chipset_em9301_instance* function is used to get a *btstack_chipset_t* instance and passed to *hci_init* function. It enables to set the BD Addr during start.
 
+## Intel Dual Wireless 8260, 8265
+
+Wifi/Bluetooth combo cards mainly used in mobile computers. The Bluetooth part requires the upload of a firmware file and a configuration file. SCO, DLE, Multiple roles not tested.
 
 ## Nordic nRF5 series
 
-The Single-Mode LE chipsets from the Nordic nRF5 series chipsets do not have an HCI interface. Instead, they provide an LE Bluetooth Stack as a binary library, the so-called *SoftDevices*. Developer can write their Bluetooth application on top of this library usually. Since the chipset can be programmed, it can also be loaded with a firmware that provides a regular HCI H4 interface for a Host.
+The Single-Mode LE chipsets from the Nordic nRF5 series chipsets usually do not have an HCI interface. Instead, they provide an LE Bluetooth Stack as a binary library, the so-called *SoftDevices*. Developer can write their Bluetooth application on top of this library. Since the chipset can be programmed, it can also be loaded with a firmware that provides a regular HCI H4 interface for a Host.
 
 An interesting feature of the nRF5 chipsets is that they can support multiple LE roles at the same time, e.g. being Central in one connection and a Peripheral in another connection. Also, the nRF52 SoftDevice implementation supports the Bluetooth 4.2 Data Length Extension.
 
-Both nRF5 series, the nRF51 and the nRF52, can be used with an HCI firmware. The HCI firmware does not support the Data Length Extension yet, but this will be supported soon. Also, the nRF51 does not support encrypted connections at the moment (November 18th, 2016) although this might become supported as well.
+Both nRF5 series, the nRF51 and the nRF52, can be used with an HCI firmware. The nRF51 does not support encrypted connections at the moment (November 18th, 2016) although this might become supported as well.
 
 **BD ADDR** is not set automatically. However, during production, a 64-bit random number is stored in the each chip. Nordic uses this random number as a random static address in their SoftDevice implementation.
 
@@ -158,17 +194,13 @@ Both nRF5 series, the nRF51 and the nRF52, can be used with an HCI firmware. The
 
 **Init script** is not required.
 
-**BTstack integration**: No special chipset driver is provided. In order to use the random static address, the provided patch stores this address as the (invalid) public address that is returned by the HCI Read BD Addr command. When BTstack detects that it is a Nordic chipset, it automatically uses this address as random static address - unless the app chooses to use private addresses.
+**BTstack integration**: Support for a nRF5 chipset with the Zephyr Controller is provided by *btstack_chipset_zephyr.c*. It queries the static random address during init.
 
 To use these chipsets with BTstack, you need to install an arm-none-eabi gcc toolchain and the nRF5x Command Line Tools incl. the J-Link drivers, checkout the Zephyr project, apply a minimal patch to help with using a random static address, and flash it onto the chipset:
 
   * Install [J-Link Software and documentation pack](https://www.segger.com/jlink-software.html).
   * Get nrfjprog as part of the [nRFx-Command-Line-Tools](http://www.nordicsemi.com/eng/Products/Bluetooth-low-energy/nRF52-DK). Click on Downloads tab on the top and look for your OS.
   * [Checkout Zephyr and install toolchain](https://www.zephyrproject.org/doc/getting_started/getting_started.html). We recommend using the [arm-non-eabi gcc binaries](https://launchpad.net/gcc-arm-embedded) instead of compiling it yourself. At least on OS X, this failed for us.
-  * Download our [patch](https://raw.githubusercontent.com/bluekitchen/btstack/master/port/nrf5-zephyr/hci_firmware.patch) into the Zephyr root folder and apply it there:
-
-<!-- -->
-      $ patch -p1 < hci_firmware.patch
 
   * In *samples/bluetooth/hci_uart* compile the firmware for nRF52 Dev Kit
 
@@ -201,24 +233,27 @@ STMicroelectronics offers the Bluetooth V2.1 + EDR chipset STLC2500D that suppor
 
 ## Texas Instruments CC256x series
 
-The Texas Instruments CC256x series is currently in its fourth iteration and provides a Classic-only (CC2560), a Dual-mode (CC2564), and a Classic + ANT (CC2567) model. A variant of the Dual-mode chipset is also integrated into TI's WiLink 8 Wifi+Bluetooth combo modules of the WL183x, WL185x, WL187x, and WL189x series.
+The Texas Instruments CC256x series is currently in its fourth iteration and provides a Classic-only (CC2560), a Dual-mode (CC2564), and a Classic + ANT (CC2567) model. A variant of the Dual-mode chipset is also integrated into TI's WiLink 8 Wifi+Bluetooth combo modules of the WL183x, WL185x, WL187x, and WL189x series. Some of the latter support ANT as well.
 
 The CC256x chipset is connected via an UART connection and supports the H4, H5 (since third iteration), and eHCILL.
 
 The latest generation CC256xC chipsets support multiple LE roles in parallel.
 
-The different CC256x chipset can be identified by the LMP Subversion returned by the *hci_read_local_version_information* command. TI also uses a numeric way (AKA) to identify their chipsets. The table shows the LMP Subversion and AKA number for the main CC256x series.
+The different CC256x chipset can be identified by the LMP Subversion returned by the *hci_read_local_version_information* command. TI also uses a numeric way (AKA) to identify their chipsets. The table shows the LMP Subversion and AKA number for the CC256x and the WL18xx series.
 
 Chipset | LMP Subversion |  AKA
 --------|----------------|-------
 CC2560  |         0x191f | 6.2.31
-CC2560A, CC2564 | 0x1B0F | 6.6.15
+CC2560A, CC2564, CC2567 | 0x1B0F | 6.6.15
 CC256xB |         0x1B90 | 6.7.16
 CC256xC |         0x9a1a | 6.12.26
+WL18xx  |         0xac20 | 11.8.32
 
 **SCO data** is routed to the I2S/PCM interface but can be configured with the [HCI_VS_Write_SCO_Configuration](http://processors.wiki.ti.com/index.php/CC256x_VS_HCI_Commands#HCI_VS_Write_SCO_Configuration_.280xFE10.29) command.
 
-**Baud rate** can be set with [HCI_VS_Update_UART_HCI_Baudrate](http://processors.wiki.ti.com/index.php/CC256x_VS_HCI_Commands#HCI_VS_Update_UART_HCI_Baudrate_.280xFF36.29). The chipset confirms the change with a command complete event after which the local UART is set to the new speed. Oddly enough, the CC256x chipsets ignore the incoming CTS line during this particular command complete response. See next paragraph for a workaround.
+**Baud rate** can be set with [HCI_VS_Update_UART_HCI_Baudrate](http://processors.wiki.ti.com/index.php/CC256x_VS_HCI_Commands#HCI_VS_Update_UART_HCI_Baudrate_.280xFF36.29). The chipset confirms the change with a command complete event after which the local UART is set to the new speed. Oddly enough, the CC256x chipsets ignore the incoming CTS line during this particular command complete response. 
+
+If you've implemented the hal_uart_dma.h without an additional ring buffer (as recommended!) and you have a bit of delay, e.g. because of thread switching on a RTOS, this could cause a UART overrun. If this happens, BTstack provides a workaround in the HCI H4 transport implementation by adding #define ENABLE_CC256X_BAUDRATE_CHANGE_FLOWCONTROL_BUG_WORKAROUND to your btstack_config.h. If this is enabled, the H4 transport layer will resort to "deep packet inspection" to first check if its a TI controller and then wait for the HCI_VS_Update_UART_HCI_Baudrate. When detected, it will tweak the next UART read to expect the HCI Command Complete event.
 
 **BD Addr** can be set with [HCI_VS_Write_BD_Addr](2.2.1 HCI_VS_Write_BD_Addr (0xFC06)) although all chipsets have an official address stored.
 
@@ -237,112 +272,13 @@ The Makefile at *chipset/cc256x/Makefile.inc* is able to automatically download 
 
 SCO Data can be routed over HCI, so HFP Wide-Band Speech is supported.
 
-**Work around for CTS bug while HCI Command Complete Event of HCI VS Update Baudrate with H4/eHCILL**
-
-If you're using a RTOS port (e.g. FreeRTOS) and have implemented the *hal_uart_dma.h* API directly, chances are, you're getting a UART overrun errors in this situation, and the bootup will get stuck at this point.
-
-BTstack currently cannot deal with this situation since it would need to request a read for the complete HCI Command Complete before sending the HCI VS Baudrate Command.
-
-We recommend to add the following workaround in the *hal_uart_dma.h* implementation to deal with this bug in the lowest layer.
-
-The idea is to detect the HCI VS Baudrate Command and then to ignore all received data for 100 ms. After that, send the appropriate HCI Command Complete Event to the HCI transport.
-
-Let's assume that your hal_uart_dma.h implementation contains *hal_uart_dma_rx_complete()* and *hal_uart_dma_tx_complete* that are called when the corresponding asynchronous request has been completed, and that you've stored the registered callbacks in *rx_done_handler* and *tx_done_handler*. Please provide new functions *hal_uart_dma_sleep_ms* that just blocks (you might have needed a similar to implement the CC256x power cycle before) and *hci_uart_dma_rx_flush* that clear all errors and flushes all incoming buffers (might not be needed on most platforms).
-
-    // types & declaration
-    static enum {
-        CC256X_HACK_IDLE,
-        CC256X_HACK_W4_SENT,
-        CC256X_HACK_W4_READ_HEADER,
-        CC256X_HACK_W4_READ_PAYLOAD,
-    } cc256x_hack_state;
-
-    ...
-
-    void hal_uart_dma_send_block(const uint8_t *buffer, uint16_t length){
-        // detect CC256x set baudrate command
-        const uint8_t baud_rate_command_prefix[] = { 0x01, 0x36, 0xff, 0x04};
-        if (memcmp(data, baud_rate_command_prefix, sizeof(baud_rate_command_prefix)) == 0) {
-            log_info("CC256x baud rate command detected");
-            cc256x_hack_state = CC256X_HACK_W4_SENT;
-        }
-
-        // your code to trigger buffer send follow
-        ...
-    }
-
-    void hal_uart_dma_receive_block(uint8_t *buffer, uint16_t len){
-        switch (cc256x_hack_state){
-            case CC256X_HACK_W4_READ_HEADER:
-                cc256x_hack_state = CC256X_HACK_W4_READ_PAYLOAD;
-                // HCI Command Complete
-                *buffer++ = 0x0e;
-                *buffer++ = 0x04;
-                (*rx_done_handler)();
-                return;
-            case CC256X_HACK_W4_READ_PAYLOAD:
-                cc256x_hack_state = CC256X_HACK_IDLE;
-                // commands 0, opcode 0xff36, status 0
-                *buffer++ = 0x01;
-                *buffer++ = 0x36;
-                *buffer++ = 0xff;
-                *buffer++ = 0x00;
-                (*rx_done_handler)();
-                return;
-            default:
-                break;
-        }
-
-        // your code to trigger buffer read follows
-        ...
-      }
-
-      static void hal_uart_dma_rx_complete(void){
-          switch (cc256x_hack_state){
-              case CC256X_HACK_W4_SENT:
-                  // ignore until sent & event received;
-                  return;
-              default:
-                  break;
-          }
-
-          // your code to call complete handler, probably looks like
-          if(rx_done_handler){
-              (*rx_done_handler)();
-          }
-      }
-
-      static void tx_done_handler(void){
-          // your code to call complete handler, probably looks like
-          if(tx_done_handler){
-              (*tx_done_handler)();
-
-              // cc256x hack
-              switch (cc256x_hack_state){
-                  case CC256X_HACK_W4_SENT:
-                      log_info("cc256x hack: sleep");
-                      hal_uart_dma_sleep_ms(100);
-                      log_info("cc256x hack: flush");
-                      hal_uart_block_reset_rx();
-                      log_info("cc256x hack: simulate command complete");
-                      *read_bytes_data++ = 0x04;
-                      read_bytes_len--;
-                      cc256x_hack_state = CC256X_HACK_W4_READ_HEADER;
-                      (*rx_done_handler)();
-                      break;
-                  default:
-                      break;
-              }
-          }
-      }
-
 ## Toshiba
 
-The Toshiba TC35661 Dual-Mode chipset is available in three variants: standalone incl. binary Bluetooth stack, as a module with embedded stack or with a regular HCI interface. The HCI variant has the model number TC35661–007.
+The Toshiba TC35661 Dual-Mode chipset is available in three variants: standalone incl. binary Bluetooth stack, as a module with embedded stack or with a regular HCI interface. The HCI variant has the model number TC35661–007 resp TC35561-009 for the newer silicon.
 
-We've tried their USB Evaluation Stick that contains an USB-to-UART adapter and the PAN1026 module that contains the TC35661 -501. We have been told by our distributor that the -501 variant also supports the HCI interface. However, while our tests have shown that Classic Bluetooth with SPP works fine with this variant, none of the LE commands work.
+We first tried their USB Evaluation Stick that contains an USB-to-UART adapter and the PAN1026 module that contains the TC35661 -501. While it does support the HCI interface and Bluetooth Classic operations worked as expected, LE HCI Commands are not supported. With the -007 and the -009 models, everything works as expected.
 
-**SCO data** might work. We didn't try.
+**SCO data** does not seem to be supported.
 
 **Baud rate** can be set with custom command.
 

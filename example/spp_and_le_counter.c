@@ -43,8 +43,12 @@
  * @text The SPP and LE Counter example combines the Bluetooth Classic SPP Counter
  * and the Bluetooth LE Counter into a single application.
  *
- * In this Section, we only point out the differences to the individual examples
- * and how how the stack is configured.
+ * @text In this Section, we only point out the differences to the individual examples
+ * and how the stack is configured.
+ *
+ * @text Note: To test, please run the example, and then: 
+ *    - for SPP pair from a remote device, and open the Virtual Serial Port,
+ *    - for LE use some GATT Explorer, e.g. LightBlue, BLExplr, to enable notifications.
  */
 // *****************************************************************************
 
@@ -112,12 +116,12 @@ static void packet_handler (uint8_t packet_type, uint16_t channel, uint8_t *pack
 	switch (packet_type) {
 		case HCI_EVENT_PACKET:
 			switch (hci_event_packet_get_type(packet)) {
-				case HCI_EVENT_PIN_CODE_REQUEST:
-					// inform about pin code request
+                case HCI_EVENT_PIN_CODE_REQUEST:
+                    // inform about pin code request
                     printf("Pin code request - using '0000'\n");
                     hci_event_pin_code_request_get_bd_addr(packet, event_addr);
-					hci_send_cmd(&hci_pin_code_request_reply, &event_addr, 4, "0000");
-					break;
+                    gap_pin_code_response(event_addr, "0000");
+                    break;
 
                 case HCI_EVENT_USER_CONFIRMATION_REQUEST:
                     // inform about user confirmation request
@@ -188,12 +192,7 @@ static uint16_t att_read_callback(hci_con_handle_t con_handle, uint16_t att_hand
     UNUSED(con_handle);
 
     if (att_handle == ATT_CHARACTERISTIC_0000FF11_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE){
-        if (buffer){
-            memcpy(buffer, &counter_string[offset], buffer_size);
-            return buffer_size;
-        } else {
-            return counter_string_len;
-        }
+        return att_read_callback_handle_blob((const uint8_t *)counter_string, buffer_size, offset, buffer, buffer_size);
     }
     return 0;
 }
@@ -262,12 +261,6 @@ static void heartbeat_handler(struct btstack_timer_source *ts){
 int btstack_main(void);
 int btstack_main(void)
 {
-    gap_discoverable_control(1);
-
-    // register for HCI events
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-
     l2cap_init();
 
     rfcomm_init();
@@ -280,7 +273,9 @@ int btstack_main(void)
     sdp_register_service(spp_service_buffer);
     printf("SDP service record size: %u\n", de_get_len(spp_service_buffer));
 
+    gap_set_local_name("SPP and LE Counter 00:00:00:00:00:00");
     gap_ssp_set_io_capability(SSP_IO_CAPABILITY_DISPLAY_YES_NO);
+    gap_discoverable_control(1);
 
     // setup le device db
     le_device_db_init();
@@ -290,12 +285,13 @@ int btstack_main(void)
 
     // setup ATT server
     att_server_init(profile_data, att_read_callback, att_write_callback);    
-    att_server_register_packet_handler(packet_handler);
 
-    // set one-shot timer
-    heartbeat.process = &heartbeat_handler;
-    btstack_run_loop_set_timer(&heartbeat, HEARTBEAT_PERIOD_MS);
-    btstack_run_loop_add_timer(&heartbeat);
+    // register for HCI events
+    hci_event_callback_registration.callback = &packet_handler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
+    // register for ATT events
+    att_server_register_packet_handler(packet_handler);
 
     // setup advertisements
     uint16_t adv_int_min = 0x0030;
@@ -306,6 +302,11 @@ int btstack_main(void)
     gap_advertisements_set_params(adv_int_min, adv_int_max, adv_type, 0, null_addr, 0x07, 0x00);
     gap_advertisements_set_data(adv_data_len, (uint8_t*) adv_data);
     gap_advertisements_enable(1);
+
+    // set one-shot timer
+    heartbeat.process = &heartbeat_handler;
+    btstack_run_loop_set_timer(&heartbeat, HEARTBEAT_PERIOD_MS);
+    btstack_run_loop_add_timer(&heartbeat);
 
     // beat once
     beat();

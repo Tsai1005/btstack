@@ -15,6 +15,7 @@ CFLAGS += -I$(BTSTACK_ROOT)/src/
 CFLAGS += -I$(BTSTACK_ROOT)/ble
 CFLAGS += -I$(BTSTACK_ROOT)/platform/daemon/src
 CFLAGS += -I$(BTSTACK_ROOT)/platform/posix
+CFLAGS += -I$(BTSTACK_ROOT)/3rd-party/md5
 CFLAGS += -I.
 
 VPATH += $(BTSTACK_ROOT)/src
@@ -23,12 +24,14 @@ VPATH += $(BTSTACK_ROOT)/src/classic
 VPATH += $(BTSTACK_ROOT)/platform/posix
 VPATH += $(BTSTACK_ROOT)/platform/daemon/src
 VPATH += $(BTSTACK_ROOT)/platform/daemon/example
+VPATH += $(BTSTACK_ROOT)/3rd-party/md5
 
 libBTstack_OBJS  = 		           \
 	btstack.o                      \
 	btstack_linked_list.o          \
 	btstack_run_loop.o             \
 	btstack_run_loop_posix.o       \
+    btstack_tlv.o                  \
 	btstack_util.o 	               \
 	hci_cmd.o                      \
 	daemon_cmds.o                  \
@@ -38,10 +41,14 @@ libBTstack_OBJS  = 		           \
 	socket_connection.o            \
 
 BTdaemon_OBJS = $(libBTstack_OBJS) \
+	ad_parser.o 			       \
 	att_dispatch.o                 \
-	btstack_link_key_db_memory.o   \
+	btstack_link_key_db_tlv.o      \
 	btstack_memory.o               \
 	btstack_memory_pool.o          \
+	btstack_tlv.o       		   \
+	btstack_tlv_posix.o 		   \
+	btstack_crypto.o               \
 	daemon.o 				       \
 	gatt_client.o                  \
 	hci.o                          \
@@ -49,7 +56,8 @@ BTdaemon_OBJS = $(libBTstack_OBJS) \
 	btstack_uart_block_posix.o     \
 	l2cap.o                        \
 	l2cap_signaling.o              \
-	le_device_db_memory.o          \
+	le_device_db_tlv.o             \
+	md5.o                          \
 	rfcomm.o                       \
 	rfcomm_service_db_hash.o       \
 	sdp_server.o                   \

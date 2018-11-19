@@ -42,8 +42,10 @@
  *
  *  HCI Transport API implementation for basic H5 protocol
  *
- *  Created by Matthias Ringwald on 4/29/09.
+ *  Created by Matthias Ringw ald on 4/29/09.
  */
+
+#include <inttypes.h>
 
 #include "hci.h"
 #include "btstack_slip.h"
@@ -108,7 +110,7 @@ static const uint8_t link_control_sleep[] =  { 0x07, 0x78};
 #define LINK_CONTROL_MAX_LEN 3
 
 // incoming pre-bufffer + 4 bytes H5 header + max(acl header + acl payload, event header + event data) + 2 bytes opt CRC
-static uint8_t   hci_packet_with_pre_buffer[HCI_INCOMING_PRE_BUFFER_SIZE + 6 + HCI_PACKET_BUFFER_SIZE];
+static uint8_t   hci_packet_with_pre_buffer[HCI_INCOMING_PRE_BUFFER_SIZE + 6 + HCI_INCOMING_PACKET_BUFFER_SIZE];
 
 // outgoing slip encoded buffer. +4 to assert that DIC fits in buffer. +1 to assert that last SOF fits in buffer.
 static uint8_t   slip_outgoing_buffer[LINK_SLIP_TX_CHUNK_LEN+4+1];
@@ -274,7 +276,7 @@ static void hci_transport_slip_send_frame(const uint8_t * header, const uint8_t 
 // SLIP Incoming
 
 static void hci_transport_slip_init(void){
-    btstack_slip_decoder_init(&hci_packet_with_pre_buffer[HCI_INCOMING_PRE_BUFFER_SIZE], 6 + HCI_PACKET_BUFFER_SIZE);
+    btstack_slip_decoder_init(&hci_packet_with_pre_buffer[HCI_INCOMING_PRE_BUFFER_SIZE], 6 + HCI_INCOMING_PACKET_BUFFER_SIZE);
 }
 
 // H5 Three-Wire Implementation
@@ -527,7 +529,7 @@ static void hci_transport_h5_process_frame(uint16_t frame_size){
     uint8_t  link_packet_type = slip_header[1] & 0x0f;
     uint16_t link_payload_len = (slip_header[1] >> 4) | (slip_header[2] << 4);
 
-    log_debug("process_frame, reliable %u, packet type %u, seq_nr %u, ack_nr %u , dic %u", reliable_packet, link_packet_type, seq_nr, ack_nr, data_integrity_check_present);
+    log_debug("process_frame, reliable %u, packet type %u, seq_nr %u, ack_nr %u , dic %u, payload 0x%04x bytes", reliable_packet, link_packet_type, seq_nr, ack_nr, data_integrity_check_present, frame_size_without_header);
     log_debug_hexdump(slip_header, 4);
     log_debug_hexdump(slip_payload, frame_size_without_header);
 
@@ -709,9 +711,13 @@ static void hci_transport_h5_process_frame(uint16_t frame_size){
 
 // recommendet time until resend: 3 * time of largest packet
 static uint16_t hci_transport_link_calc_resend_timeout(uint32_t baudrate){
-    uint32_t max_packet_size_in_bit = (HCI_PACKET_BUFFER_SIZE + 6) << 3;
+    uint32_t max_packet_size_in_bit = (HCI_INCOMING_PACKET_BUFFER_SIZE + 6) << 3;
     uint32_t t_max_x3_ms = max_packet_size_in_bit * 3000 / baudrate;
-    log_info("resend timeout for %u baud: %u ms", baudrate, t_max_x3_ms);
+
+    // allow for BTstack logging and other delays
+    t_max_x3_ms += 50;
+
+    log_info("resend timeout for %"PRIu32" baud: %u ms", baudrate, (int) t_max_x3_ms);
     return t_max_x3_ms;
 }
 
@@ -727,10 +733,23 @@ static void hci_transport_h5_read_next_byte(void){
     btstack_uart->receive_block(&hci_transport_link_read_byte, 1);    
 }
 
+// track time receiving SLIP frame
+static uint32_t hci_transport_h5_receive_start;
 static void hci_transport_h5_block_received(){
+    // track start time when receiving first byte // a bit hackish
+    if (hci_transport_h5_receive_start == 0 && hci_transport_link_read_byte != BTSTACK_SLIP_SOF){
+        hci_transport_h5_receive_start = btstack_run_loop_get_time_ms();
+    }
     btstack_slip_decoder_process(hci_transport_link_read_byte);
     uint16_t frame_size = btstack_slip_decoder_frame_size();
     if (frame_size) {
+        // track time
+        uint32_t packet_receive_time = btstack_run_loop_get_time_ms() - hci_transport_h5_receive_start;
+        uint32_t nominmal_time = (frame_size + 6) * 10 * 1000 / uart_config.baudrate;
+        log_info("slip frame time %u ms for %u decoded bytes. nomimal time %u ms", (int) packet_receive_time, frame_size, (int) nominmal_time);
+        // reset state
+        hci_transport_h5_receive_start = 0;
+        // 
         hci_transport_h5_process_frame(frame_size);
         hci_transport_slip_init();
     }
@@ -828,7 +847,6 @@ static int hci_transport_h5_open(void){
 
 static int hci_transport_h5_close(void){
     return btstack_uart->close();
-    return 0;
 }
 
 static void hci_transport_h5_register_packet_handler(void (*handler)(uint8_t packet_type, uint8_t *packet, uint16_t size)){
@@ -869,7 +887,7 @@ static int hci_transport_h5_send_packet(uint8_t packet_type, uint8_t *packet, in
 
 static int hci_transport_h5_set_baudrate(uint32_t baudrate){
 
-    log_info("set_baudrate %u", baudrate);
+    log_info("set_baudrate %"PRIu32, baudrate);
     int res = btstack_uart->set_baudrate(baudrate);
 
     if (res) return res;
