@@ -64,10 +64,15 @@
 
 uint8_t hfp_service_buffer[150];
 const uint8_t   rfcomm_channel_nr = 1;
-const char hfp_hf_service_name[] = "BTstack HFP HF Demo";
-/* static bd_addr_t device_addr = {0x80,0xbe,0x05,0xd5,0x28,0x48}; */
-/* static bd_addr_t device_addr = {0x80,0x13,0x82,0x8e,0x8a,0x4d};      //HUAWEI TAG-TL00 */
-static bd_addr_t device_addr = {0x7c,0x04,0xd0,0x66,0xa4,0x37};      //JL-iphone7
+const char hfp_hf_service_name[] = "HFP HF Demo";
+
+#ifdef HAVE_BTSTACK_STDIN
+/* static const char *device_addr_string = "0x80,0xbe,0x05,0xd5,0x28,0x48"; */
+/* static const char *device_addr_string = "0x80,0x13,0x82,0x8e,0x8a,0x4d";      //HUAWEI TAG-TL00 */
+/* static const char *device_addr_string = "0x7c,0x04,0xd0,0x66,0xa4,0x37";      //JL-iphone7 */
+
+static const char *device_addr_string = "0x5C,0x03,0x39,0xE7,0x1A,0xEB";      //HuaWei P10 Plus
+#endif
 
 static bd_addr_t device_addr;
 
