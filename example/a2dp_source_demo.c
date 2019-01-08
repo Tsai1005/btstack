@@ -148,6 +148,7 @@ static btstack_packet_callback_registration_t hci_event_callback_registration;
 // BT dongle:       static const char * device_addr_string = "00:1A:7D:DA:71:0A";
 // Sony MDR-ZX330BT static const char * device_addr_string = "00:18:09:28:50:18";
 // Panda (BM6)      static const char * device_addr_string = "4F:3F:66:52:8B:E0";
+// JBL flip 4
 static const char * device_addr_string = "04:FE:A1:BD:57:0A";
 
 static bd_addr_t device_addr;
