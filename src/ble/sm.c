@@ -720,7 +720,7 @@ static void sm_notify_client_passkey(uint8_t type, hci_con_handle_t con_handle, 
 }
 
 static void sm_notify_client_index(uint8_t type, hci_con_handle_t con_handle, uint8_t addr_type, bd_addr_t address, uint16_t index){
-    // fetch addr and addr type from db
+    // fetch addr and addr type from db, only called for valid entries
     bd_addr_t identity_address;
     int identity_address_type;
     le_device_db_info(index, &identity_address_type, identity_address, NULL);
@@ -1175,7 +1175,7 @@ static void sm_address_resolution_handle_event(address_resolution_event_t event)
                         break;
                     }
 #ifdef ENABLE_LE_CENTRAL
-                    le_device_db_encryption_get(sm_connection->sm_le_db_index, NULL, NULL, ltk, NULL, NULL, NULL);
+                    le_device_db_encryption_get(sm_connection->sm_le_db_index, NULL, NULL, ltk, NULL, NULL, NULL, NULL);
                     have_ltk = !sm_is_null_key(ltk);
                     pairing_need = sm_connection->sm_pairing_requested || sm_connection->sm_security_request_received;
                     log_info("central: pairing request local %u, remote %u => action %u. have_ltk %u",
@@ -1254,7 +1254,7 @@ static void sm_key_distribution_handle_all_received(sm_connection_t * sm_conn){
                 bd_addr_t address;
                 int address_type = BD_ADDR_TYPE_UNKNOWN;
                 le_device_db_info(i, &address_type, address, irk);
-                // check if valid entry retrieved
+                // skip unused entries
                 if (address_type == BD_ADDR_TYPE_UNKNOWN) continue;
                 // compare IRK
                 if (memcmp(irk, setup->sm_peer_irk, 16) != 0) continue;
@@ -1274,8 +1274,10 @@ static void sm_key_distribution_handle_all_received(sm_connection_t * sm_conn){
             int i;
             for (i=0; i < le_device_db_max_count(); i++){
                 bd_addr_t address;
-                int address_type;
+                int address_type = BD_ADDR_TYPE_UNKNOWN;
                 le_device_db_info(i, &address_type, address, NULL);
+                // skip unused entries
+                if (address_type == BD_ADDR_TYPE_UNKNOWN) continue;
                 log_info("device %u, sm peer addr type %u, peer addres %s", i, address_type, bd_addr_to_str(address));
                 if (address_type == BD_ADDR_TYPE_LE_PUBLIC && memcmp(address, setup->sm_peer_address, 6) == 0){
                     log_info("sm: device found for public address, updating");
@@ -1315,7 +1317,7 @@ static void sm_key_distribution_handle_all_received(sm_connection_t * sm_conn){
                 uint8_t zero_rand[8];
                 memset(zero_rand, 0, 8);
                 le_device_db_encryption_set(le_db_index, 0, zero_rand, setup->sm_ltk, sm_conn->sm_actual_encryption_key_size,
-                    sm_conn->sm_connection_authenticated, sm_conn->sm_connection_authorization_state == AUTHORIZATION_GRANTED);
+                    sm_conn->sm_connection_authenticated, sm_conn->sm_connection_authorization_state == AUTHORIZATION_GRANTED, 1);
             }
 
             // store encryption information for legacy pairing: peer LTK, EDIV, RAND
@@ -1323,7 +1325,7 @@ static void sm_key_distribution_handle_all_received(sm_connection_t * sm_conn){
                    && (setup->sm_key_distribution_received_set & SM_KEYDIST_FLAG_MASTER_IDENTIFICATION )){
                 log_info("sm: set encryption information (key size %u, authenticated %u)", sm_conn->sm_actual_encryption_key_size, sm_conn->sm_connection_authenticated);
                 le_device_db_encryption_set(le_db_index, setup->sm_peer_ediv, setup->sm_peer_rand, setup->sm_peer_ltk,
-                    sm_conn->sm_actual_encryption_key_size, sm_conn->sm_connection_authenticated, sm_conn->sm_connection_authorization_state == AUTHORIZATION_GRANTED);
+                    sm_conn->sm_actual_encryption_key_size, sm_conn->sm_connection_authenticated, sm_conn->sm_connection_authorization_state == AUTHORIZATION_GRANTED, 0);
 
             }
         }
@@ -1779,14 +1781,16 @@ static void sm_load_security_info(sm_connection_t * sm_connection){
     int encryption_key_size;
     int authenticated;
     int authorized;
+    int secure_connection;
 
     // fetch data from device db - incl. authenticated/authorized/key size. Note all sm_connection_X require encryption enabled
     le_device_db_encryption_get(sm_connection->sm_le_db_index, &setup->sm_peer_ediv, setup->sm_peer_rand, setup->sm_peer_ltk,
-                                &encryption_key_size, &authenticated, &authorized);
-    log_info("db index %u, key size %u, authenticated %u, authorized %u", sm_connection->sm_le_db_index, encryption_key_size, authenticated, authorized);
+                                &encryption_key_size, &authenticated, &authorized, &secure_connection);
+    log_info("db index %u, key size %u, authenticated %u, authorized %u, secure connetion %u", sm_connection->sm_le_db_index, encryption_key_size, authenticated, authorized, secure_connection);
     sm_connection->sm_actual_encryption_key_size = encryption_key_size;
     sm_connection->sm_connection_authenticated = authenticated;
     sm_connection->sm_connection_authorization_state = authorized ? AUTHORIZATION_GRANTED : AUTHORIZATION_UNKNOWN;
+    sm_connection->sm_connection_sc = secure_connection;
 }
 #endif
 
@@ -1799,6 +1803,8 @@ static void sm_start_calculating_ltk_from_ediv_and_rand(sm_connection_t * sm_con
     sm_connection->sm_actual_encryption_key_size = (setup->sm_local_rand[7] & 0x0f) + 1;
     // no db for authenticated flag hack: flag is stored in bit 4 of LSB
     sm_connection->sm_connection_authenticated = (setup->sm_local_rand[7] & 0x10) >> 4;
+    // Legacy paring -> not SC
+    sm_connection->sm_connection_sc = 0;
     log_info("sm: received ltk request with key size %u, authenticated %u",
             sm_connection->sm_actual_encryption_key_size, sm_connection->sm_connection_authenticated);
     sm_connection->sm_engine_state = SM_RESPONDER_PH4_Y_GET_ENC;
@@ -1905,11 +1911,17 @@ static void sm_run(void){
     if (!sm_address_resolution_idle()){
         log_info("LE Device Lookup: device %u/%u", sm_address_resolution_test, le_device_db_max_count());
         while (sm_address_resolution_test < le_device_db_max_count()){
-            int addr_type;
+            int addr_type = BD_ADDR_TYPE_UNKNOWN;
             bd_addr_t addr;
             sm_key_t irk;
             le_device_db_info(sm_address_resolution_test, &addr_type, addr, irk);
             log_info("device type %u, addr: %s", addr_type, bd_addr_to_str(addr));
+
+            // skip unused entries
+            if (addr_type == BD_ADDR_TYPE_UNKNOWN){
+                sm_address_resolution_test++;
+                continue;
+            }
 
             if (sm_address_resolution_addr_type == addr_type && memcmp(addr, sm_address_resolution_address, 6) == 0){
                 log_info("LE Device Lookup: found CSRK by { addr_type, address} ");
@@ -1917,7 +1929,8 @@ static void sm_run(void){
                 break;
             }
 
-            if (sm_address_resolution_addr_type == 0){
+            // if connection type is public, it must be a different one
+            if (sm_address_resolution_addr_type == BD_ADDR_TYPE_LE_PUBLIC){
                 sm_address_resolution_test++;
                 continue;
             }
@@ -2020,7 +2033,7 @@ static void sm_run(void){
                 case SM_RESPONDER_SEND_SECURITY_REQUEST:
                     // send packet if possible,
                     if (l2cap_can_send_fixed_channel_packet_now(sm_connection->sm_handle, L2CAP_CID_SECURITY_MANAGER_PROTOCOL)){
-                        const uint8_t buffer[2] = { SM_CODE_SECURITY_REQUEST, SM_AUTHREQ_BONDING};
+                        const uint8_t buffer[2] = { SM_CODE_SECURITY_REQUEST, sm_auth_req};
                         sm_connection->sm_engine_state = SM_RESPONDER_PH1_W4_PAIRING_REQUEST;
                         l2cap_send_connectionless(sm_connection->sm_handle, L2CAP_CID_SECURITY_MANAGER_PROTOCOL, (uint8_t*) buffer, sizeof(buffer));
                     } else {
@@ -2936,6 +2949,7 @@ static void sm_handle_random_result_ir(void *arg){
         log_info("Generated IR key. Store in TLV status: %d", status);
     }
     log_info_key("IR", sm_persistent_ir);
+    dkg_state = DKG_CALC_IRK;
     sm_run();
 }
 
@@ -2994,6 +3008,7 @@ static void sm_event_packet_handler (uint8_t packet_type, uint16_t channel, uint
                             }
                         } else {
                             sm_validate_er_ir();
+                            dkg_state = DKG_CALC_IRK;
                         }
 					}
 					break;
@@ -3129,6 +3144,7 @@ static void sm_event_packet_handler (uint8_t packet_type, uint16_t channel, uint
                     }
 
                     if (!sm_conn->sm_connection_encrypted) break;
+                    sm_conn->sm_connection_sc = setup->sm_use_secure_connections;
 
                     // continue pairing
                     switch (sm_conn->sm_engine_state){
@@ -3202,8 +3218,14 @@ static void sm_event_packet_handler (uint8_t packet_type, uint16_t channel, uint
                     }
 
                     // pairing failed, if it was ongoing
-                    if (sm_conn->sm_engine_state != SM_INITIATOR_CONNECTED && sm_conn->sm_engine_state != SM_GENERAL_IDLE){
-                        sm_notify_client_status_reason(sm_conn, ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION, 0);
+                    switch (sm_conn->sm_engine_state){
+                        case SM_GENERAL_IDLE:
+                        case SM_INITIATOR_CONNECTED:
+                        case SM_RESPONDER_IDLE:
+                            break;
+                        default:
+                            sm_notify_client_status_reason(sm_conn, ERROR_CODE_REMOTE_USER_TERMINATED_CONNECTION, 0);
+                            break;
                     }
 
                     sm_conn->sm_engine_state = SM_GENERAL_IDLE;
@@ -3871,7 +3893,7 @@ void sm_init(void){
 #ifdef USE_CMAC_ENGINE
     sm_cmac_active  = 0;
 #endif
-    dkg_state = DKG_CALC_IRK;
+    dkg_state = DKG_W4_WORKING;
     rau_state = RAU_IDLE;
     sm_aes128_state = SM_AES128_IDLE;
     sm_address_resolution_test = -1;    // no private address to resolve yet
@@ -3949,7 +3971,7 @@ void sm_request_pairing(hci_con_handle_t con_handle){
             switch (sm_conn->sm_irk_lookup_state){
                 case IRK_LOOKUP_SUCCEEDED:
 #ifndef ENABLE_LE_CENTRAL_AUTO_ENCRYPTION
-                    le_device_db_encryption_get(sm_conn->sm_le_db_index, NULL, NULL, ltk, NULL, NULL, NULL);
+                    le_device_db_encryption_get(sm_conn->sm_le_db_index, NULL, NULL, ltk, NULL, NULL, NULL, NULL);
                     int have_ltk = !sm_is_null_key(ltk);
                     log_info("have ltk %u", have_ltk);
                     // trigger 'pairing complete' event on encryption change
